@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>控場與講師提詞端 — StageDeckInteract</title>
+<style>
+:root{--bg:#0b1120;--panel:#131d31;--border:#26344d;--text:#f8fafc;--muted:#94a3b8;--accent:#6366f1;--sky:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC","Microsoft JhengHei",-apple-system,sans-serif;padding:20px}
+.container{max-width:1180px;margin:0 auto}
+.login-box{max-width:400px;margin:80px auto;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:28px}
+h1,h2,h3{margin:0 0 12px}
+.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:18px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=password]{flex:1;min-width:180px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:14px}
+button{padding:10px 15px;border:0;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;background:#1e293b;color:var(--text);transition:opacity .15s}
+button:hover{opacity:.9}
+button.primary{background:var(--accent);color:#fff}
+button.sky{background:var(--sky);color:#061224}
+button.ok{background:var(--ok);color:#052e16}
+button.warn{background:var(--warn);color:#2a1800}
+button.bad{background:var(--bad);color:#fff}
+button.ghost{border:1px solid var(--border);background:transparent}
+.q-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;cursor:pointer;gap:10px;font-size:14px}
+.q-item.active{border-color:var(--sky);background:rgba(56,189,248,.14)}
+.tag{font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(148,163,184,.15);color:#cbd5e1;font-weight:700}
+.tag.ok{background:rgba(34,197,94,.18);color:#86efac}
+.tag.warn{background:rgba(245,158,11,.18);color:#fcd34d}
+.status-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px}
+.msg-item{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0c1426;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.msg-item.spot{border-color:var(--warn);background:rgba(245,158,11,.12)}
+.msg-item.hid{opacity:.45}
+.teleprompter{
+  background:linear-gradient(155deg,#0f172a,#1e1b4b);
+  border:1.5px solid rgba(99,102,241,.45);border-radius:16px;padding:18px 20px;margin-bottom:18px;
+}
+.note-body{font-size:19px;line-height:1.65;color:#f8fafc;margin:8px 0 12px;white-space:pre-wrap}
+.next-preview{font-size:13px;color:var(--muted);padding-top:10px;border-top:1px dashed rgba(148,163,184,.25)}
+.muted{color:var(--muted);font-size:13px}
+a{color:var(--sky)}
+</style>
+</head>
+<body>
+<div class="container">
+  <div id="loginView" class="login-box">
+    <h2>🎛 控場與講師提詞端</h2>
+    <p class="muted" style="margin-bottom:16px">請輸入控場密碼（預設 <code>2026</code>，可於環境變數 <code>ADMIN_PASSWORD</code> 修改）</p>
+    <div class="row" style="margin-bottom:10px">
+      <input id="roomInputLogin" type="text" placeholder="房間代碼（預設 main）">
+    </div>
+    <div class="row">
+      <input id="pwdInput" type="password" placeholder="輸入密碼">
+      <button id="loginBtn" class="primary">登入</button>
+    </div>
+    <p id="loginErr" style="color:var(--bad);font-size:13px;margin-top:10px"></p>
+  </div>
+
+  <div id="mainView" style="display:none">
+    <div class="status-bar">
+      <div>
+        <div class="row" style="gap:10px;margin-bottom:4px">
+          <h1 style="margin:0">🎛 控場與提詞後台</h1>
+          <span id="storageBadge" class="tag">載入中</span>
+          <span id="roomBadge" class="tag">Room: main</span>
+        </div>
+        <span id="sourceInfo" class="muted">載入中...</span>
+      </div>
+      <div class="row">
+        <a id="stageLink" href="/" target="_blank"><button class="sky">🖥 開啟大螢幕 (/)</button></a>
+        <a id="mobileLink" href="/m" target="_blank"><button class="ghost">📱 預覽手機端 (/m)</button></a>
+        <button id="remoteQrBtn" class="ghost">📲 講者手機遙控 QR</button>
+      </div>
+    </div>
+
+    <div id="remoteCard" class="card" style="display:none;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;border-color:rgba(56,189,248,.45)">
+      <div style="flex:1;min-width:240px">
+        <h3 style="margin-bottom:6px">📱 講者手機隨身遙控器（含提詞與翻頁）</h3>
+        <p class="muted" style="margin:0 0 10px">講者用手機掃描右側 QR Code，即可免密碼開啟手機遙控器與隨身口白提詞。</p>
+        <div class="row">
+          <a id="remoteLink" href="/remote" target="_blank"><button class="ghost">🔗 開啟遙控器</button></a>
+          <button id="copyRemoteBtn" class="ghost">📋 複製遙控網址</button>
+          <span id="copyTip" class="muted"></span>
+        </div>
+      </div>
+      <div style="background:#fff;padding:8px;border-radius:12px">
+        <img id="remoteQrImg" alt="Remote QR" style="width:120px;height:120px;display:block">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📊 Google Sheets 通用簡報與題庫熱重載 (Zero-Code CMS)</h3>
+      <p class="muted" style="margin:0 0 10px">
+        於 Google 試算表「檔案 → 共享 → 發布到網路 → CSV」取得連結並貼上，即可一鍵切換整場講座主題與簡報。
+        下載範本：<a href="/api/sample-deck.csv" download>Deck 範本 (.csv)</a> ｜ <a href="/api/sample-config.csv" download>Config 範本 (.csv)</a>
+      </p>
+      <div class="row" style="margin-bottom:10px">
+        <input id="deckInput" type="text" placeholder="貼上 Deck 工作表 CSV 連結（留空則使用內建個人研習示範投影片）">
+        <input id="configInput" type="text" placeholder="選填：Config 工作表 CSV 連結" style="max-width:340px">
+        <button id="syncBtn" class="primary">🔄 熱重載更新</button>
+      </div>
+      <div class="row" style="justify-content:space-between">
+        <span id="syncMsg" class="muted"></span>
+        <span id="shareUrlPreview" class="muted"></span>
+      </div>
+    </div>
+
+    <div class="teleprompter">
+      <div class="row" style="justify-content:space-between">
+        <span class="tag" style="background:rgba(99,102,241,.25);color:#c7d2fe">🎙 講師口白提詞器 (speaker_note)</span>
+        <span id="curSlideMeta" class="tag">--</span>
+      </div>
+      <div id="speakerNoteText" class="note-body">（本頁未填寫講者備忘錄）</div>
+      <div id="nextSlidePreview" class="next-preview">下一頁預告：--</div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:12px">
+            <h3 style="margin:0">🎯 簡報筆狀態機控制</h3>
+            <span id="liveCount" class="tag" style="font-size:14px;color:var(--sky)">已參與 0 人</span>
+          </div>
+          <div id="curInfo" style="margin-bottom:14px;font-size:16px;font-weight:700">載入中...</div>
+          <div class="row" style="margin-bottom:10px">
+            <button id="prevBtn">⬅ 上一頁</button>
+            <button id="nextBtn" class="primary">下一步 / 下一頁 ➡</button>
+            <button id="qrToggleBtn" class="ghost">📱 切換浮動 QR</button>
+            <button id="burstBtn" class="ghost">⚡ 模擬 30 人湧入</button>
+          </div>
+          <div class="row">
+            <button id="readyBtn" class="ghost">⏳ READY</button>
+            <button id="voteBtn" class="ok">▶ 開放作答 (VOTING)</button>
+            <button id="lockBtn" class="warn">🔒 截止 (LOCKED)</button>
+            <button id="revealBtn" class="sky">✨ 揭曉答案 (REVEALED)</button>
+            <button id="resetBtn" class="bad">🗑 重置本頁</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>📑 全場投影片與互動腳本（點擊跳轉）</h3>
+          <div id="deckList" style="max-height:460px;overflow-y:auto"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <h3 style="margin:0">💬 彈幕審核與中央聚焦牆</h3>
+            <button id="clearSpotBtn" class="ghost" style="padding:6px 10px;font-size:12px">取消聚焦</button>
+          </div>
+          <p class="muted" style="margin:0 0 12px">在 <code>DANMAKU</code> 頁面時，點擊「推上聚焦」可將留言放大顯示於大螢幕正中央。</p>
+          <div id="msgList" style="max-height:560px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const urlParams = new URLSearchParams(location.search);
+let roomId = urlParams.get('room') || 'main';
+$('roomInputLogin').value = roomId;
+
+let pwd = sessionStorage.getItem('sdi_admin_pwd') || '';
+let state = null;
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function api(url, method = 'GET', body = null) {
+  const sep = url.includes('?') ? '&' : '?';
+  const fullUrl = `${url}${sep}room=${encodeURIComponent(roomId)}`;
+  const opts = { method, headers: { 'x-admin-password': pwd } };
+  if (body) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify({ roomId, ...body });
+  }
+  const r = await fetch(fullUrl, opts);
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401) {
+    sessionStorage.removeItem('sdi_admin_pwd');
+    $('loginView').style.display = 'block';
+    $('mainView').style.display = 'none';
+    throw new Error(data.message || '密碼錯誤');
+  }
+  if (!r.ok) throw new Error(data.message || '操作失敗');
+  return data;
+}
+
+async function tryLogin(inputPwd) {
+  roomId = ($('roomInputLogin').value || 'main').trim() || 'main';
+  pwd = inputPwd;
+  try {
+    const res = await api('/api/admin/login', 'POST', { password: pwd });
+    sessionStorage.setItem('sdi_admin_pwd', pwd);
+    $('loginView').style.display = 'none';
+    $('mainView').style.display = 'block';
+    state = res.state;
+    $('deckInput').value = state.deckUrl || '';
+    $('configInput').value = state.configUrl || '';
+    setupLinks(res.remoteToken);
+    render();
+  } catch (e) {
+    $('loginErr').textContent = e.message;
+  }
+}
+
+async function setupLinks(remoteToken) {
+  let baseUrl = location.origin;
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    try {
+      const info = await fetch('/api/network-info').then(r => r.json());
+      if (info.urls?.length) baseUrl = info.urls[0];
+    } catch {}
+  }
+  $('stageLink').href = `/?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(remoteToken || '')}`;
+  $('mobileLink').href = `/m?room=${encodeURIComponent(roomId)}`;
+  const remoteUrl = `${baseUrl}/remote?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(remoteToken || '')}`;
+  $('remoteQrImg').src = `/api/qr.svg?url=${encodeURIComponent(remoteUrl)}`;
+  $('remoteLink').href = remoteUrl;
+  $('copyRemoteBtn').onclick = () => {
+    navigator.clipboard?.writeText(remoteUrl);
+    $('copyTip').textContent = '✓ 已複製';
+    setTimeout(() => { $('copyTip').textContent = ''; }, 2000);
+  };
+  $('remoteQrBtn').onclick = () => {
+    const c = $('remoteCard');
+    c.style.display = c.style.display === 'none' ? 'flex' : 'none';
+  };
+}
+
+$('loginBtn').onclick = () => tryLogin($('pwdInput').value);
+$('pwdInput').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };
+if (pwd) tryLogin(pwd);
+
+async function ctrl(action, extra = {}) {
+  const res = await api('/api/admin/control', 'POST', { action, ...extra });
+  state = res.state;
+  render();
+}
+
+$('prevBtn').onclick = () => ctrl('prev');
+$('nextBtn').onclick = () => ctrl('next');
+$('qrToggleBtn').onclick = () => ctrl('toggleQr');
+$('readyBtn').onclick = () => ctrl('phase', { phase: 'READY' });
+$('voteBtn').onclick = () => ctrl('phase', { phase: 'VOTING' });
+$('lockBtn').onclick = () => ctrl('phase', { phase: 'LOCKED' });
+$('revealBtn').onclick = () => ctrl('phase', { phase: 'REVEALED' });
+$('resetBtn').onclick = () => { if (confirm('確定清空本頁目前所有互動數據與留言？')) ctrl('reset'); };
+$('clearSpotBtn').onclick = () => ctrl('spotlight', { msgId: null });
+$('burstBtn').onclick = () => ctrl('burst', { count: 30 });
+
+$('syncBtn').onclick = async () => {
+  $('syncMsg').textContent = '同步中...';
+  try {
+    const deckUrl = $('deckInput').value.trim();
+    const configUrl = $('configInput').value.trim();
+    const res = await api('/api/admin/sheet', 'POST', { deckUrl, configUrl });
+    state = res.state;
+    $('syncMsg').textContent = `✓ 已載入 ${res.count} 頁（${res.source}）`;
+    render();
+  } catch (e) {
+    $('syncMsg').textContent = `✕ 同步失敗：${e.message}`;
+  }
+};
+
+function render() {
+  if (!state) return;
+  $('roomBadge').textContent = `Room: ${state.roomId}`;
+  const sb = $('storageBadge');
+  if (state.storageKind === 'redis') {
+    sb.className = 'tag ok';
+    sb.textContent = 'Upstash Redis 高併發就緒';
+  } else if (state.isVercel) {
+    sb.className = 'tag warn';
+    sb.textContent = '⚠ Serverless 暫存模式（建議綁定 Upstash Redis）';
+  } else {
+    sb.className = 'tag ok';
+    sb.textContent = 'Memory + SSE 即時模式';
+  }
+
+  $('sourceInfo').textContent = `活動：${state.config?.event_title || ''} ｜ 腳本來源：${state.deckSource || '內建範本'}（共 ${state.total || 0} 頁）`;
+  if (state.deckUrl) {
+    const share = `${location.origin}/?room=${encodeURIComponent(roomId)}&sheet=${encodeURIComponent(state.deckUrl)}`;
+    $('shareUrlPreview').innerHTML = `大螢幕帶參數連結：<a href="${esc(share)}" target="_blank">開啟 ?sheet=...</a>`;
+  } else {
+    $('shareUrlPreview').textContent = '';
+  }
+
+  $('liveCount').textContent = `已參與 ${state.stats?.totalVotes || 0} 人`;
+  $('curSlideMeta').textContent = `#${state.order} · ${state.mode}${state.layout ? ' (' + state.layout + ')' : ''} · ${state.phase}`;
+  $('curInfo').textContent = `[${state.idx + 1}/${state.total}] ${state.title}${state.mode === 'SLIDE' && state.layout === 'BULLETS' ? `（漸進步驟 ${state.subStep}/${state.bullets?.length || 0}）` : ''}`;
+
+  $('speakerNoteText').textContent = state.speakerNote || '（本頁未填寫講者備忘錄 speaker_note）';
+  $('nextSlidePreview').textContent = state.nextSlide
+    ? `下一頁預告：#${state.nextSlide.order} [${state.nextSlide.mode}${state.nextSlide.layout ? '/' + state.nextSlide.layout : ''}] ${state.nextSlide.title}`
+    : '下一頁預告：已達最後一頁';
+
+  $('deckList').innerHTML = (state.deckList || []).map(item => `
+    <div class="q-item ${item.index === state.idx ? 'active' : ''}" data-idx="${item.index}">
+      <div>
+        <span class="tag">${esc(item.mode)}</span>
+        ${item.layout ? `<span class="tag">${esc(item.layout)}</span>` : ''}
+        <span style="margin-left:4px">${esc(item.title)}</span>
+      </div>
+      <span class="muted">#${item.order}</span>
+    </div>
+  `).join('');
+  document.querySelectorAll('.q-item').forEach(el => {
+    el.onclick = () => ctrl('goto', { index: Number(el.dataset.idx) });
+  });
+
+  const msgs = state.allMessages || [];
+  const spotId = state.stats?.spotlightId;
+  $('msgList').innerHTML = msgs.length === 0
+    ? '<p class="muted">目前尚無彈幕留言</p>'
+    : msgs.map(m => `
+      <div class="msg-item ${spotId === m.id ? 'spot' : ''} ${m.hidden ? 'hid' : ''}">
+        <div>
+          <span class="tag">${esc(m.tag)}</span>
+          <span>${esc(m.text)}</span>
+        </div>
+        <div class="row" style="flex-shrink:0">
+          <button onclick="ctrl('spotlight',{msgId:'${spotId === m.id ? '' : m.id}'})" class="${spotId === m.id ? 'warn' : 'primary'}" style="padding:6px 10px;font-size:12px">${spotId === m.id ? '取消聚焦' : '推上聚焦'}</button>
+          <button onclick="ctrl('hideMessage',{msgId:'${m.id}',hidden:${!m.hidden}})" class="ghost" style="padding:6px 10px;font-size:12px">${m.hidden ? '恢復' : '隱藏'}</button>
+        </div>
+      </div>
+    `).join('');
+}
+
+async function refresh() {
+  if (!pwd || $('mainView').style.display === 'none') return;
+  try {
+    state = await api('/api/admin/state');
+    render();
+  } catch {}
+}
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>

@@ -1,0 +1,1242 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>互動簡報大螢幕 — StageDeckInteract</title>
+<style>
+:root{
+  --primary:#6366f1;
+  --primary-soft:rgba(99,102,241,.18);
+  --primary-border:rgba(99,102,241,.45);
+  --bg:#060b18;
+  --bg-grad:radial-gradient(ellipse at 50% 18%,#141e46 0%,#060b18 72%);
+  --surface:rgba(15,23,42,.78);
+  --surface-strong:rgba(15,23,42,.92);
+  --border:rgba(148,163,184,.24);
+  --text:#f8fafc;
+  --muted:#94a3b8;
+  --gold:#fbbf24;
+  --shadow:0 20px 60px rgba(0,0,0,.55);
+}
+body.theme-CLEAN_LIGHT{
+  --bg:#f4f7fb;
+  --bg-grad:radial-gradient(ellipse at 50% 10%,#ffffff 0%,#e8eef8 100%);
+  --surface:rgba(255,255,255,.88);
+  --surface-strong:rgba(255,255,255,.97);
+  --border:rgba(15,23,42,.12);
+  --text:#0f172a;
+  --muted:#475569;
+  --shadow:0 18px 48px rgba(15,23,42,.1);
+}
+body.theme-TECH_GRID{
+  --bg:#030712;
+  --bg-grad:radial-gradient(circle at 50% 30%,#0b192e 0%,#030712 75%);
+  --surface:rgba(9,14,28,.82);
+  --surface-strong:rgba(9,14,28,.95);
+  --border:rgba(56,189,248,.24);
+  --text:#f8fafc;
+  --muted:#94a3b8;
+}
+*{box-sizing:border-box}
+html,body{
+  margin:0;width:100%;height:100%;overflow:hidden;
+  background:var(--bg-grad);color:var(--text);
+  font-family:"Noto Sans TC","Microsoft JhengHei",-apple-system,BlinkMacSystemFont,sans-serif;
+  transition:background .35s,color .35s;
+}
+canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
+
+/* Top HUD */
+.hud-top{
+  position:fixed;top:22px;left:36px;right:36px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+  gap:20px;z-index:12;pointer-events:none;
+}
+.brand-area{display:flex;flex-direction:column;gap:8px;max-width:74%}
+.brand-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand-logo{height:34px;max-width:140px;object-fit:contain;border-radius:6px;display:none}
+.event-chip{
+  font-size:14px;font-weight:700;color:var(--muted);
+  display:flex;align-items:center;gap:8px;
+}
+.pill{
+  padding:6px 14px;border-radius:999px;font-size:14px;font-weight:700;
+  background:var(--primary-soft);border:1px solid var(--primary-border);
+  color:var(--text);backdrop-filter:blur(8px);
+}
+.pill.neutral{background:var(--surface);border-color:var(--border);color:var(--muted)}
+.pill.warn{background:rgba(245,158,11,.18);border-color:rgba(245,158,11,.5);color:#f59e0b}
+.pill.offline{background:rgba(239,68,68,.18);border-color:rgba(239,68,68,.5);color:#f87171}
+
+.interactive-header{margin-top:4px}
+.interactive-header h1{
+  margin:0;font-size:clamp(26px,3vw,46px);font-weight:900;line-height:1.22;
+  letter-spacing:-.01em;
+}
+.interactive-header p{
+  margin:8px 0 0;font-size:clamp(15px,1.45vw,22px);color:var(--muted);line-height:1.4;
+}
+
+/* Floating QR */
+.qr-float{
+  pointer-events:auto;
+  background:var(--surface-strong);backdrop-filter:blur(12px);
+  border:1px solid var(--border);border-radius:18px;padding:12px;
+  text-align:center;box-shadow:var(--shadow);
+  transition:opacity .25s,transform .25s;
+}
+.qr-float.hidden{opacity:0;transform:translateY(-14px);pointer-events:none}
+.qr-float img{width:116px;height:116px;border-radius:10px;display:block;background:#fff;padding:5px;margin:0 auto}
+.qr-float span{display:block;font-size:12px;color:var(--muted);margin-top:6px;font-weight:700;max-width:136px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* SLIDE Stage Layer */
+.slide-stage{
+  position:fixed;inset:0;z-index:8;
+  display:flex;align-items:center;justify-content:center;
+  padding:94px 6vw 68px;
+  transition:opacity .28s ease;
+}
+.slide-stage.hidden{opacity:0;pointer-events:none}
+.slide-inner{width:100%;max-width:1320px;margin:0 auto}
+
+/* Layout: COVER */
+.layout-cover{
+  display:grid;grid-template-columns:1.35fr .85fr;gap:48px;align-items:center;
+}
+@media(max-width:960px){.layout-cover{grid-template-columns:1fr;text-align:center}}
+.cover-accent{width:84px;height:6px;border-radius:99px;background:var(--primary);margin-bottom:22px}
+.cover-title{
+  font-size:clamp(38px,4.8vw,72px);font-weight:900;line-height:1.15;margin:0 0 18px;
+  letter-spacing:-.02em;
+}
+.cover-sub{
+  font-size:clamp(20px,2.1vw,32px);color:var(--muted);font-weight:600;line-height:1.45;margin:0 0 24px;
+}
+.cover-body{
+  display:inline-block;padding:14px 22px;border-radius:16px;
+  background:var(--primary-soft);border:1px solid var(--primary-border);
+  font-size:clamp(16px,1.35vw,21px);font-weight:700;line-height:1.5;
+}
+.cover-qr-card{
+  background:var(--surface-strong);border:1.5px solid var(--primary-border);
+  border-radius:28px;padding:28px;text-align:center;box-shadow:var(--shadow);
+  justify-self:center;width:min(360px,100%);
+}
+.cover-qr-box{background:#fff;padding:14px;border-radius:20px;display:inline-block;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.cover-qr-box img{width:min(240px,28vh);height:min(240px,28vh);display:block}
+.cover-qr-label{margin-top:16px;font-size:18px;font-weight:800}
+.cover-qr-url{
+  margin-top:8px;font-size:14px;font-weight:700;color:var(--primary);
+  background:var(--primary-soft);padding:6px 14px;border-radius:999px;display:inline-block;word-break:break-all;
+}
+
+/* Layout: QUOTE */
+.layout-quote{max-width:1050px;margin:0 auto;text-align:center;position:relative}
+.quote-mark{
+  font-size:120px;line-height:.6;font-family:Georgia,serif;color:var(--primary);
+  opacity:.55;margin-bottom:16px;user-select:none;
+}
+.quote-main{
+  font-size:clamp(28px,3.4vw,52px);font-weight:900;line-height:1.38;margin:0 0 22px;
+}
+.quote-trans{
+  font-size:clamp(20px,2.1vw,32px);color:var(--primary);font-weight:700;line-height:1.48;margin:0 0 28px;
+}
+.quote-attr{font-size:clamp(16px,1.4vw,22px);color:var(--muted);font-weight:700;letter-spacing:.5px}
+
+/* Layout: BULLETS */
+.layout-bullets{max-width:1120px;margin:0 auto}
+.slide-h{font-size:clamp(30px,3.4vw,52px);font-weight:900;line-height:1.22;margin:0 0 10px}
+.slide-sub{font-size:clamp(16px,1.5vw,24px);color:var(--muted);margin:0 0 28px}
+.bullet-list{display:flex;flex-direction:column;gap:16px}
+.bullet-item{
+  display:flex;align-items:center;gap:18px;
+  padding:20px 26px;border-radius:20px;
+  background:var(--surface);border:1px solid var(--border);
+  box-shadow:0 8px 24px rgba(0,0,0,.12);
+  font-size:clamp(20px,1.9vw,30px);font-weight:700;line-height:1.4;
+  transition:opacity .35s ease,transform .35s cubic-bezier(.2,.8,.2,1),border-color .3s;
+}
+.bullet-item.hidden-step{opacity:0;transform:translateY(18px);pointer-events:none}
+.bullet-item.current-step{border-color:var(--primary-border);box-shadow:0 12px 32px var(--primary-soft)}
+.bullet-num{
+  width:42px;height:42px;border-radius:12px;flex-shrink:0;
+  background:var(--primary);color:#fff;font-weight:900;font-size:20px;
+  display:flex;align-items:center;justify-content:center;
+}
+.step-hint{margin-top:16px;font-size:14px;color:var(--muted);font-weight:700}
+
+/* Layout: SPLIT */
+.layout-split-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:12px}
+@media(max-width:860px){.layout-split-grid{grid-template-columns:1fr}}
+.split-card{
+  background:var(--surface);border:1.5px solid var(--border);
+  border-radius:24px;padding:30px 32px;box-shadow:var(--shadow);
+}
+.split-card.right{border-color:var(--primary-border);background:linear-gradient(160deg,var(--surface),var(--primary-soft))}
+.split-head{font-size:clamp(22px,2.1vw,32px);font-weight:900;margin:0 0 18px;display:flex;align-items:center;gap:10px}
+.split-badge{width:12px;height:28px;border-radius:6px;background:var(--muted);display:inline-block}
+.split-card.right .split-badge{background:var(--primary)}
+.split-ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px}
+.split-ul li{
+  font-size:clamp(17px,1.55vw,24px);line-height:1.5;font-weight:600;
+  padding-left:22px;position:relative;
+}
+.split-ul li::before{
+  content:"";position:absolute;left:0;top:.52em;width:9px;height:9px;border-radius:50%;
+  background:var(--primary);
+}
+
+/* Layout: MEDIA */
+.layout-media{display:flex;flex-direction:column;height:calc(100vh - 170px);justify-content:center}
+.media-frame{
+  flex:1;min-height:0;display:flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1px solid var(--border);border-radius:24px;
+  padding:16px;box-shadow:var(--shadow);overflow:hidden;
+}
+.media-frame img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
+.media-caption{margin-top:12px;text-align:center;font-size:16px;color:var(--muted);font-weight:600}
+
+/* Spotlight Danmaku */
+.spotlight{
+  position:fixed;left:50%;top:55%;transform:translate(-50%,-50%) scale(.92);
+  width:min(840px,86vw);background:var(--surface-strong);
+  border:2.5px solid var(--gold);border-radius:28px;padding:36px 42px;
+  box-shadow:0 24px 80px rgba(0,0,0,.65),0 0 50px rgba(251,191,36,.25);
+  z-index:25;opacity:0;pointer-events:none;transition:all .28s cubic-bezier(.2,.9,.3,1.1);
+}
+.spotlight.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.spotlight-tag{display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(251,191,36,.18);color:var(--gold);font-weight:800;font-size:16px;margin-bottom:14px}
+.spotlight-text{font-size:clamp(28px,3.2vw,46px);font-weight:800;line-height:1.4;margin:0}
+
+/* Overview Grid (O) */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(2,6,23,.82);backdrop-filter:blur(10px);
+  z-index:40;display:none;align-items:center;justify-content:center;padding:32px;
+}
+.modal-backdrop.show{display:flex}
+.overview-panel{
+  width:min(1200px,94vw);max-height:86vh;overflow-y:auto;
+  background:var(--surface-strong);border:1px solid var(--border);
+  border-radius:24px;padding:26px;box-shadow:var(--shadow);
+}
+.overview-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.overview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.ov-card{
+  padding:14px 16px;border-radius:16px;border:1.5px solid var(--border);
+  background:var(--surface);cursor:pointer;text-align:left;color:var(--text);
+  transition:transform .12s,border-color .15s;
+}
+.ov-card:hover{transform:translateY(-2px);border-color:var(--primary)}
+.ov-card.active{border-color:var(--primary);background:var(--primary-soft)}
+.ov-meta{font-size:12px;font-weight:800;color:var(--primary);margin-bottom:6px;display:flex;justify-content:space-between}
+.ov-title{font-size:15px;font-weight:800;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* Bottom Progress & Presenter Controls */
+.progress-track{position:fixed;left:0;right:0;bottom:0;height:5px;background:rgba(148,163,184,.18);z-index:30}
+.progress-fill{height:100%;width:0%;background:var(--primary);transition:width .3s ease}
+.bottom-bar{
+  position:fixed;left:24px;right:24px;bottom:14px;z-index:20;
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  pointer-events:none;
+}
+.ctrl-cluster{
+  pointer-events:auto;display:flex;align-items:center;gap:6px;
+  background:var(--surface-strong);border:1px solid var(--border);
+  padding:5px 8px;border-radius:999px;opacity:.45;transition:opacity .2s;
+  backdrop-filter:blur(8px);
+}
+.ctrl-cluster:hover{opacity:1}
+.ctrl-btn{
+  border:0;background:transparent;color:var(--text);font-size:13px;font-weight:700;
+  padding:6px 10px;border-radius:999px;cursor:pointer;
+}
+.ctrl-btn:hover{background:var(--primary-soft);color:var(--primary)}
+.hotkey-hint{font-size:12px;color:var(--muted);opacity:.6;font-weight:600}
+.toast{
+  position:fixed;top:24px;left:50%;transform:translateX(-50%) translateY(-16px);
+  background:var(--surface-strong);border:1px solid var(--primary-border);
+  padding:10px 20px;border-radius:999px;font-size:14px;font-weight:700;
+  z-index:50;opacity:0;pointer-events:none;transition:all .25s;box-shadow:var(--shadow);
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="hud-top">
+  <div class="brand-area">
+    <div class="brand-row">
+      <img id="brandLogo" class="brand-logo" alt="Logo">
+      <span id="eventChip" class="event-chip"></span>
+      <span id="modePill" class="pill">載入中</span>
+      <span id="countPill" class="pill neutral" style="display:none">已參與 0 人</span>
+      <span id="timerPill" class="pill warn" style="display:none"></span>
+      <span id="offlinePill" class="pill offline" style="display:none">本機單機模式</span>
+    </div>
+    <div id="interactiveHeader" class="interactive-header" style="display:none">
+      <h1 id="mainTitle"></h1>
+      <p id="subTitle"></p>
+    </div>
+  </div>
+  <div id="qrFloat" class="qr-float">
+    <img id="qrFloatImg" alt="QR Code">
+    <span id="qrFloatLabel">掃碼加入互動</span>
+  </div>
+</div>
+
+<div id="slideStage" class="slide-stage hidden">
+  <div id="slideInner" class="slide-inner"></div>
+</div>
+
+<div id="spotlight" class="spotlight">
+  <div id="spTag" class="spotlight-tag">現場提問聚焦</div>
+  <p id="spText" class="spotlight-text"></p>
+</div>
+
+<div id="overviewModal" class="modal-backdrop">
+  <div class="overview-panel">
+    <div class="overview-head">
+      <h2 style="margin:0">📑 全場投影片與互動總覽（點擊跳轉）</h2>
+      <button class="ctrl-btn" onclick="toggleOverview(false)" style="border:1px solid var(--border)">關閉 [O / Esc]</button>
+    </div>
+    <div id="overviewGrid" class="overview-grid"></div>
+  </div>
+</div>
+
+<div id="pinModal" class="modal-backdrop">
+  <div class="overview-panel" style="max-width:400px;text-align:center">
+    <h3 style="margin:0 0 8px">🔐 解鎖全場同步控場</h3>
+    <p style="font-size:14px;color:var(--muted);margin:0 0 16px">請輸入講師控場密碼（預設 <code>2026</code>），解鎖後即可直接用簡報筆切換全場手機畫面。</p>
+    <input id="pinInput" type="password" placeholder="輸入密碼" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:16px;margin-bottom:12px">
+    <div style="display:flex;gap:10px;justify-content:center">
+      <button class="ctrl-btn" onclick="closePinModal()" style="border:1px solid var(--border);padding:10px 18px">取消</button>
+      <button class="ctrl-btn" onclick="submitPin()" style="background:var(--primary);color:#fff;padding:10px 22px">解鎖同步</button>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <div class="ctrl-cluster">
+    <button class="ctrl-btn" onclick="stageAction('prev')">⬅ 上一頁</button>
+    <button class="ctrl-btn" onclick="stageAction('next')">下一步 ➡</button>
+    <button class="ctrl-btn" onclick="toggleOverview()">📑 總覽 [O]</button>
+    <button class="ctrl-btn" onclick="stageAction('toggleQr')">📱 QR [Q]</button>
+    <button class="ctrl-btn" onclick="stageAction('reload')">🔄 重載 [R]</button>
+    <button class="ctrl-btn" onclick="toggleFullscreen()">⛶ 全螢幕 [F]</button>
+  </div>
+  <div class="hotkey-hint">簡報筆：[→ / PageDown] 下一步 ｜ [← / PageUp] 上一頁 ｜ [Q] QR ｜ [O] 總覽 ｜ [R] 熱重載 ｜ [1~5] 加票 ｜ [B] 模擬 30 人</div>
+</div>
+<div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+<div id="toast" class="toast"></div>
+
+<script>
+const params = new URLSearchParams(location.search);
+const roomId = params.get('room') || 'main';
+const sheetParam = params.get('sheet') || '';
+const configParam = params.get('config') || '';
+let presenterToken = params.get('token') || localStorage.getItem('sdi_stage_token_' + roomId) || '';
+if (params.get('token')) {
+  localStorage.setItem('sdi_stage_token_' + roomId, presenterToken);
+}
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 1920, H = 1080, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+const COLORS = ['#38bdf8', '#a855f7', '#34d399', '#fb923c', '#f472b6', '#facc15'];
+const MODE_NAMES = {
+  SLIDE: '簡報講義',
+  BUBBLE: '物理碰撞氣泡圖',
+  SPECTRUM: '理念天平 / 雙向拔河',
+  MYTH: '破除迷思限時競賽',
+  QUADRANT: '二維心態落點矩陣',
+  TREE: '星空共育願景之樹',
+  DANMAKU: '滾動彈幕 × 講者聚焦牆',
+};
+
+let state = null;
+let offlineMode = false;
+let joinUrl = `${location.origin}/m?room=${encodeURIComponent(roomId)}`;
+let preloadedMedia = new Set();
+let lastSlideKey = '';
+let lastSlideId = '';
+let lastAppliedTheme = '';
+
+// Canvas visual states
+const bubbles = new Map();
+let spectrumTilt = 0, spectrumAvgLerp = 50;
+const quadParticles = [];
+let seenQuadCount = 0;
+const treeLeaves = [], treeBeams = [];
+let seenTreeCount = 0;
+const danmakuItems = [], seenDanmakuIds = new Set();
+
+const stars = Array.from({ length: 75 }, () => ({
+  x: Math.random(), y: Math.random(),
+  r: 0.8 + Math.random() * 1.9,
+  a: 0.2 + Math.random() * 0.55,
+  sp: 0.002 + Math.random() * 0.005,
+}));
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+function esc(s) {
+  return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Discover LAN URL when running locally
+fetch('/api/network-info').then(r => r.json()).then(info => {
+  if ((location.hostname === 'localhost' || location.hostname === '127.0.0.1') && info.urls?.length) {
+    joinUrl = `${info.urls[0]}/m?room=${encodeURIComponent(roomId)}`;
+  }
+  refreshQrImages();
+}).catch(() => refreshQrImages());
+
+function refreshQrImages() {
+  const qrSrc = '/api/qr.svg?url=' + encodeURIComponent(joinUrl);
+  document.getElementById('qrFloatImg').src = qrSrc;
+  const coverImg = document.getElementById('coverQrImg');
+  if (coverImg) coverImg.src = qrSrc;
+}
+
+function preloadMedia(urls) {
+  for (const u of urls || []) {
+    if (!u || preloadedMedia.has(u)) continue;
+    preloadedMedia.add(u);
+    const img = new Image();
+    img.src = u;
+  }
+}
+
+function applyTheme(cfg) {
+  if (!cfg) return;
+  const primary = cfg.primary_color || '#6366f1';
+  const theme = cfg.bg_theme || 'DARK_NEBULA';
+  if (lastAppliedTheme !== `${primary}|${theme}`) {
+    lastAppliedTheme = `${primary}|${theme}`;
+    const r = parseInt(primary.slice(1, 3), 16) || 99;
+    const g = parseInt(primary.slice(3, 5), 16) || 102;
+    const b = parseInt(primary.slice(5, 7), 16) || 241;
+    const root = document.documentElement.style;
+    root.setProperty('--primary', primary);
+    root.setProperty('--primary-soft', `rgba(${r},${g},${b},0.16)`);
+    root.setProperty('--primary-border', `rgba(${r},${g},${b},0.48)`);
+    document.body.className = `theme-${theme}`;
+  }
+
+  const logo = document.getElementById('brandLogo');
+  if (cfg.logo_url) {
+    logo.src = cfg.logo_url;
+    logo.style.display = 'block';
+  } else {
+    logo.style.display = 'none';
+  }
+  document.getElementById('eventChip').textContent = cfg.event_title || '';
+  document.title = `${cfg.event_title || '互動簡報'} — Stage`;
+}
+
+function resetVisualCaches(slideId) {
+  lastSlideId = slideId;
+  bubbles.clear();
+  quadParticles.length = 0; seenQuadCount = 0;
+  treeLeaves.length = 0; treeBeams.length = 0; seenTreeCount = 0;
+  danmakuItems.length = 0; seenDanmakuIds.clear();
+}
+
+function syncVisualData(s) {
+  if (!s) return;
+  if (s.slideId !== lastSlideId) resetVisualCaches(s.slideId);
+  const st = s.stats || {};
+
+  if (s.mode === 'BUBBLE') {
+    const opts = s.options || [];
+    opts.forEach((o, i) => {
+      const count = st.counts?.[o.key] || 0;
+      if (!bubbles.has(o.key)) {
+        const angle = (i / Math.max(1, opts.length)) * Math.PI * 2;
+        bubbles.set(o.key, {
+          key: o.key, label: o.label, color: COLORS[i % COLORS.length],
+          x: W / 2 + Math.cos(angle) * 180, y: H * 0.57 + Math.sin(angle) * 120,
+          vx: 0, vy: 0, r: 68, targetR: 68, count,
+        });
+      }
+      const b = bubbles.get(o.key);
+      b.count = count; b.label = o.label;
+    });
+  } else if (s.mode === 'QUADRANT') {
+    const pts = st.recentPoints || [];
+    if (pts.length < seenQuadCount) { quadParticles.length = 0; seenQuadCount = 0; }
+    for (let i = seenQuadCount; i < pts.length; i++) {
+      quadParticles.push({
+        tx: pts[i].x / 100, ty: pts[i].y / 100, cx: 0.5, cy: 1.05,
+        r: 4 + Math.random() * 3, alpha: 0.45 + Math.random() * 0.35,
+      });
+    }
+    seenQuadCount = pts.length;
+    if (quadParticles.length > 800) quadParticles.splice(0, quadParticles.length - 800);
+  } else if (s.mode === 'TREE') {
+    const bl = st.recentBlessings || [];
+    if (bl.length < seenTreeCount) { treeLeaves.length = 0; seenTreeCount = 0; }
+    for (let i = seenTreeCount; i < bl.length; i++) {
+      const angle = -Math.PI + Math.random() * Math.PI;
+      const dist = 40 + Math.random() * Math.min(W, H) * 0.25;
+      treeBeams.push({
+        x: W / 2 + (Math.random() - 0.5) * 240, y: H * 0.92,
+        tx: W / 2 + Math.cos(angle) * dist * 1.15,
+        ty: H * 0.44 + Math.sin(angle) * dist * 0.72,
+        p: 0, color: COLORS[i % COLORS.length], text: bl[i].text,
+      });
+    }
+    seenTreeCount = bl.length;
+  } else if (s.mode === 'DANMAKU') {
+    const msgs = st.messages || [];
+    for (const m of msgs) {
+      if (!seenDanmakuIds.has(m.id)) {
+        seenDanmakuIds.add(m.id);
+        const lane = Math.floor(Math.random() * 8);
+        danmakuItems.push({
+          id: m.id, tag: m.tag, text: m.text,
+          x: W + 40 + Math.random() * 120,
+          y: H * 0.25 + lane * ((H * 0.62) / 8),
+          speed: 1.8 + Math.random() * 1.3,
+          color: COLORS[lane % COLORS.length],
+        });
+      }
+    }
+    const sp = document.getElementById('spotlight');
+    const spMsg = st.spotlightId ? msgs.find(m => m.id === st.spotlightId) : null;
+    if (spMsg) {
+      document.getElementById('spTag').textContent = `# ${spMsg.tag}`;
+      document.getElementById('spText').textContent = spMsg.text;
+      sp.classList.add('show');
+    } else {
+      sp.classList.remove('show');
+    }
+  } else {
+    document.getElementById('spotlight').classList.remove('show');
+  }
+}
+
+function renderSlideDOM(s) {
+  const stageEl = document.getElementById('slideStage');
+  const innerEl = document.getElementById('slideInner');
+  const interHeader = document.getElementById('interactiveHeader');
+
+  if (!s) return;
+  const key = `${s.slideId}|${s.mode}|${s.layout}|${s.subStep}|${s.title}|${s.body}|${s.mediaUrl}`;
+  const isSlide = s.mode === 'SLIDE';
+
+  // Floating QR visibility: hide automatically on COVER (which has large QR card) unless user explicitly toggled on non-cover
+  const qrFloat = document.getElementById('qrFloat');
+  const displayUrl = s.config?.join_url_display || joinUrl;
+  document.getElementById('qrFloatLabel').textContent = s.config?.join_url_display || '掃碼加入互動';
+  const showFloatQr = Boolean(s.qrVisible) && !(isSlide && s.layout === 'COVER');
+  qrFloat.classList.toggle('hidden', !showFloatQr);
+
+  // HUD pills
+  const total = Math.max(1, s.total || 1);
+  document.getElementById('progressFill').style.width = `${Math.round(((s.idx + 1) / total) * 100)}%`;
+  document.getElementById('modePill').textContent = `${s.idx + 1} / ${total} · ${MODE_NAMES[s.mode] || s.mode}${isSlide && s.layout ? ' · ' + s.layout : ''}`;
+
+  const countPill = document.getElementById('countPill');
+  const timerPill = document.getElementById('timerPill');
+  if (isSlide) {
+    countPill.style.display = 'none';
+    timerPill.style.display = 'none';
+    interHeader.style.display = 'none';
+    stageEl.classList.remove('hidden');
+  } else {
+    countPill.style.display = 'inline-block';
+    countPill.textContent = `已參與 ${s.stats?.totalVotes || 0} 人`;
+    interHeader.style.display = 'block';
+    document.getElementById('mainTitle').textContent = s.title || '';
+    document.getElementById('subTitle').textContent = s.subtitle || '';
+    stageEl.classList.add('hidden');
+
+    if (s.mode === 'MYTH' && s.phase === 'READY') {
+      timerPill.style.display = 'inline-block';
+      timerPill.textContent = '⏳ 準備中（按下一頁開始作答）';
+    } else if (s.timerEndsAt && s.phase === 'VOTING') {
+      const rem = Math.max(0, Math.ceil((s.timerEndsAt - Date.now()) / 1000));
+      timerPill.style.display = 'inline-block';
+      timerPill.textContent = `⏱ ${rem}s`;
+    } else if (s.phase === 'LOCKED') {
+      timerPill.style.display = 'inline-block';
+      timerPill.textContent = '🔒 已截止作答';
+    } else if (s.phase === 'REVEALED') {
+      timerPill.style.display = 'inline-block';
+      timerPill.textContent = '✨ 答案已揭曉';
+    } else {
+      timerPill.style.display = 'none';
+    }
+  }
+
+  if (!isSlide || lastSlideKey === key) return;
+  lastSlideKey = key;
+
+  const layout = s.layout || 'BULLETS';
+  if (layout === 'COVER') {
+    const qrSrc = '/api/qr.svg?url=' + encodeURIComponent(joinUrl);
+    innerEl.innerHTML = `
+      <div class="layout-cover">
+        <div>
+          <div class="cover-accent"></div>
+          <h1 class="cover-title">${esc(s.title)}</h1>
+          ${s.subtitle ? `<p class="cover-sub">${esc(s.subtitle)}</p>` : ''}
+          ${s.body ? `<div class="cover-body">${esc(s.body)}</div>` : ''}
+        </div>
+        <div class="cover-qr-card">
+          <div class="cover-qr-box"><img id="coverQrImg" src="${qrSrc}" alt="QR Code"></div>
+          <div class="cover-qr-label">📱 掃描領取同步講義 &amp; 互動</div>
+          <div class="cover-qr-url">${esc(displayUrl)}</div>
+        </div>
+      </div>`;
+  } else if (layout === 'QUOTE') {
+    const parts = s.bullets?.length ? s.bullets : (s.body ? [s.body] : []);
+    innerEl.innerHTML = `
+      <div class="layout-quote">
+        <div class="quote-mark">“</div>
+        <h1 class="quote-main">${esc(parts[0] || s.title)}</h1>
+        ${parts[1] ? `<p class="quote-trans">${esc(parts[1])}</p>` : ''}
+        <div class="quote-attr">— ${esc(s.subtitle || s.title)}</div>
+      </div>`;
+  } else if (layout === 'BULLETS') {
+    const items = s.bullets || [];
+    const step = s.subStep || 0;
+    innerEl.innerHTML = `
+      <div class="layout-bullets">
+        <h1 class="slide-h">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub">${esc(s.subtitle)}</p>` : ''}
+        <div class="bullet-list">
+          ${items.map((txt, i) => {
+            const visible = i < step;
+            const isCur = i === step - 1;
+            return `<div class="bullet-item ${visible ? (isCur ? 'current-step' : '') : 'hidden-step'}">
+              <span class="bullet-num">${i + 1}</span>
+              <span>${esc(txt)}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="step-hint">漸進重點展開：${Math.min(step, items.length)} / ${items.length} ${step < items.length ? '（按簡報筆下一頁展開下一點）' : '（已全部展開，再按一次前往下一頁）'}</div>
+      </div>`;
+  } else if (layout === 'SPLIT') {
+    const left = s.columns?.left || [];
+    const right = s.columns?.right || [];
+    const renderCol = (arr, isRight) => {
+      if (!arr.length) return '';
+      const hasHead = arr.length > 1 && /[：:]$/.test(arr[0]);
+      const head = hasHead ? arr[0].replace(/[：:]$/, '') : (isRight ? '解決方案 / 建議' : '現況 / 對照');
+      const list = hasHead ? arr.slice(1) : arr;
+      return `
+        <div class="split-card ${isRight ? 'right' : ''}">
+          <h2 class="split-head"><span class="split-badge"></span>${esc(head)}</h2>
+          <ul class="split-ul">${list.map(x => `<li>${esc(x)}</li>`).join('')}</ul>
+        </div>`;
+    };
+    innerEl.innerHTML = `
+      <div>
+        <h1 class="slide-h">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub">${esc(s.subtitle)}</p>` : ''}
+        <div class="layout-split-grid">${renderCol(left, false)}${renderCol(right, true)}</div>
+      </div>`;
+  } else if (layout === 'MEDIA') {
+    innerEl.innerHTML = `
+      <div class="layout-media">
+        <h1 class="slide-h" style="font-size:clamp(24px,2.5vw,38px)">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub" style="margin-bottom:16px">${esc(s.subtitle)}</p>` : ''}
+        <div class="media-frame">
+          ${s.mediaUrl ? `<img src="${esc(s.mediaUrl)}" alt="${esc(s.title)}">` : '<span style="color:var(--muted)">尚未設定 media_url</span>'}
+        </div>
+        ${s.body ? `<div class="media-caption">${esc(s.body)}</div>` : ''}
+      </div>`;
+  }
+}
+
+function isLightTheme() {
+  return state?.config?.bg_theme === 'CLEAN_LIGHT';
+}
+
+// ---------- 60FPS Canvas Renderers ----------
+function drawBackdrop(t) {
+  const light = isLightTheme();
+  const theme = state?.config?.bg_theme || 'DARK_NEBULA';
+
+  if (theme === 'TECH_GRID') {
+    ctx.strokeStyle = 'rgba(56,189,248,0.08)';
+    ctx.lineWidth = 1;
+    const step = 64;
+    const off = (t * 0.35) % step;
+    for (let x = 0; x < W; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = off; y < H; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  for (const s of stars) {
+    const a = s.a * (0.6 + 0.4 * Math.sin(t * s.sp + s.x * 10));
+    ctx.fillStyle = light ? `rgba(99,102,241,${a * 0.28})` : `rgba(186,230,253,${a})`;
+    ctx.beginPath();
+    ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function drawBubbleMode() {
+  const arr = Array.from(bubbles.values());
+  if (arr.length === 0) return;
+  const light = isLightTheme();
+  const maxC = Math.max(1, ...arr.map(b => b.count));
+  const leader = arr.reduce((a, b) => (b.count > a.count ? b : a), arr[0]);
+  const cy = H * 0.58;
+  const baseR = Math.min(W, H) * 0.08;
+  const maxAdd = Math.min(W, H) * 0.13;
+
+  for (const b of arr) {
+    b.targetR = baseR + Math.sqrt(b.count / maxC) * maxAdd;
+    b.r += (b.targetR - b.r) * 0.08;
+    b.vx += (W / 2 - b.x) * 0.0018;
+    b.vy += (cy - b.y) * 0.0018;
+    b.vx *= 0.9; b.vy *= 0.9;
+    b.x += b.vx; b.y += b.vy;
+  }
+
+  for (let i = 0; i < arr.length; i++) {
+    for (let j = i + 1; j < arr.length; j++) {
+      const a = arr[i], b = arr[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const minDist = a.r + b.r + 18;
+      if (dist < minDist) {
+        const push = (minDist - dist) * 0.06;
+        const nx = dx / dist, ny = dy / dist;
+        a.vx -= nx * push; a.vy -= ny * push;
+        b.vx += nx * push; b.vy += ny * push;
+      }
+    }
+  }
+
+  for (const b of arr) {
+    const isLeader = leader.count > 0 && b === leader;
+    ctx.save();
+    ctx.shadowColor = isLeader ? '#fbbf24' : b.color;
+    ctx.shadowBlur = isLeader ? 42 : 22;
+    const grad = ctx.createRadialGradient(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.1, b.x, b.y, b.r);
+    grad.addColorStop(0, '#ffffff66');
+    grad.addColorStop(0.55, b.color + 'dd');
+    grad.addColorStop(1, b.color + '88');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.fill();
+    ctx.lineWidth = isLeader ? 4.5 : 2;
+    ctx.strokeStyle = isLeader ? '#fbbf24' : (light ? '#ffffffaa' : '#ffffff55');
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `800 ${Math.max(16, Math.round(b.r * 0.19))}px "Noto Sans TC",sans-serif`;
+    ctx.fillText(b.label, b.x, b.y - 4, b.r * 1.72);
+    ctx.font = `900 ${Math.max(18, Math.round(b.r * 0.24))}px "Noto Sans TC",sans-serif`;
+    ctx.fillStyle = '#f0f9ff';
+    ctx.fillText(`${b.count} 票`, b.x, b.y + Math.max(22, b.r * 0.27));
+
+    if (isLeader) {
+      ctx.font = '800 17px "Noto Sans TC",sans-serif';
+      ctx.fillStyle = light ? '#d97706' : '#fde047';
+      ctx.fillText('👑 最受關注首選', b.x, b.y - b.r - 14);
+    }
+  }
+}
+
+function drawSpectrumMode(s) {
+  const light = isLightTheme();
+  const avg = s.stats?.avgSpectrum ?? 50;
+  spectrumAvgLerp += (avg - spectrumAvgLerp) * 0.08;
+  const targetTilt = ((spectrumAvgLerp - 50) / 50) * 0.22;
+  spectrumTilt += (targetTilt - spectrumTilt) * 0.08;
+
+  const cx = W / 2, cy = H * 0.62;
+  const barW = Math.min(W * 0.72, 1000);
+  const leftLabel = s.options?.[0]?.label || '左端';
+  const rightLabel = s.options?.[1]?.label || '右端';
+  const leftPct = Math.round(100 - spectrumAvgLerp);
+  const rightPct = 100 - leftPct;
+
+  ctx.fillStyle = light ? '#94a3b8' : '#334155';
+  ctx.beginPath();
+  ctx.moveTo(cx, cy + 16); ctx.lineTo(cx - 48, cy + 110); ctx.lineTo(cx + 48, cy + 110);
+  ctx.closePath(); ctx.fill();
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(spectrumTilt);
+  const grad = ctx.createLinearGradient(-barW / 2, 0, barW / 2, 0);
+  grad.addColorStop(0, '#0ea5e9');
+  grad.addColorStop(0.5, '#6366f1');
+  grad.addColorStop(1, '#ec4899');
+  ctx.shadowColor = '#6366f1';
+  ctx.shadowBlur = 24;
+  ctx.fillStyle = grad;
+  ctx.beginPath(); ctx.roundRect(-barW / 2, -14, barW, 28, 14); ctx.fill();
+  ctx.restore();
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#0ea5e9';
+  ctx.font = '900 54px "Noto Sans TC",sans-serif';
+  ctx.fillText(`${leftPct}%`, cx - barW / 2, cy - 110);
+  ctx.fillStyle = light ? '#0f172a' : '#f8fafc';
+  ctx.font = '700 25px "Noto Sans TC",sans-serif';
+  ctx.fillText(leftLabel, cx - barW / 2, cy - 68, barW * 0.45);
+
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#ec4899';
+  ctx.font = '900 54px "Noto Sans TC",sans-serif';
+  ctx.fillText(`${rightPct}%`, cx + barW / 2, cy - 110);
+  ctx.fillStyle = light ? '#0f172a' : '#f8fafc';
+  ctx.font = '700 25px "Noto Sans TC",sans-serif';
+  ctx.fillText(rightLabel, cx + barW / 2, cy - 68, barW * 0.45);
+}
+
+function drawMythMode(s, t) {
+  const light = isLightTheme();
+  const cx = W / 2, cy = H * 0.59;
+  const total = s.stats?.totalVotes || 0;
+
+  if (s.phase !== 'REVEALED') {
+    const pulse = 1 + 0.04 * Math.sin(t * 0.08);
+    ctx.save();
+    ctx.strokeStyle = s.phase === 'READY' ? '#94a3b8' : (s.phase === 'LOCKED' ? '#f59e0b' : (s.config?.primary_color || '#6366f1'));
+    ctx.lineWidth = 10;
+    ctx.shadowColor = ctx.strokeStyle;
+    ctx.shadowBlur = 28;
+    ctx.beginPath(); ctx.arc(cx, cy, 145 * pulse, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = light ? '#0f172a' : '#ffffff';
+    ctx.font = '900 72px "Noto Sans TC",sans-serif';
+    ctx.fillText(String(total), cx, cy + 14);
+    ctx.fillStyle = light ? '#475569' : '#94a3b8';
+    ctx.font = '700 22px "Noto Sans TC",sans-serif';
+    const msg = s.phase === 'READY' ? '準備就緒，按簡報筆下一頁開始作答' : (s.phase === 'LOCKED' ? '已截止作答，再按一次揭曉真相' : '人已作答（即時分佈保密中）');
+    ctx.fillText(msg, cx, cy + 58);
+    return;
+  }
+
+  const correctKey = s.correctOpt;
+  const correctCount = s.stats?.counts?.[correctKey] || 0;
+  const pct = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+  const ringX = W * 0.27, ringY = H * 0.58, R = 132;
+
+  ctx.lineWidth = 28;
+  ctx.strokeStyle = 'rgba(239,68,68,.32)';
+  ctx.beginPath(); ctx.arc(ringX, ringY, R, 0, Math.PI * 2); ctx.stroke();
+
+  ctx.strokeStyle = '#22c55e';
+  ctx.beginPath();
+  ctx.arc(ringX, ringY, R, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * pct) / 100);
+  ctx.stroke();
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#16a34a';
+  ctx.font = '900 56px "Noto Sans TC",sans-serif';
+  ctx.fillText(`${pct}%`, ringX, ringY + 14);
+  ctx.fillStyle = light ? '#475569' : '#cbd5e1';
+  ctx.font = '700 20px "Noto Sans TC",sans-serif';
+  ctx.fillText('全場答對率', ringX, ringY + 50);
+
+  const rx = W * 0.45;
+  let ry = H * 0.36;
+  ctx.textAlign = 'left';
+  (s.options || []).forEach((o) => {
+    const c = s.stats?.counts?.[o.key] || 0;
+    const isOk = o.key === correctKey;
+    ctx.fillStyle = isOk ? 'rgba(34,197,94,.22)' : (light ? 'rgba(255,255,255,.85)' : 'rgba(15,23,42,.75)');
+    ctx.strokeStyle = isOk ? '#22c55e' : (light ? '#cbd5e1' : '#334155');
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(rx, ry, W * 0.46, 58, 12); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = isOk ? (light ? '#15803d' : '#86efac') : (light ? '#0f172a' : '#e2e8f0');
+    ctx.font = '700 22px "Noto Sans TC",sans-serif';
+    ctx.fillText(`${isOk ? '✅ ' : ''}${o.label}`, rx + 18, ry + 37, W * 0.34);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${c} 票`, rx + W * 0.44, ry + 37);
+    ctx.textAlign = 'left';
+    ry += 72;
+  });
+
+  if (s.explanation) {
+    ctx.fillStyle = light ? '#b45309' : '#fde047';
+    ctx.font = '700 21px "Noto Sans TC",sans-serif';
+    ctx.fillText(`💡 解析：${s.explanation}`, rx, ry + 26, W * 0.46);
+  }
+}
+
+function drawQuadrantMode(s) {
+  const light = isLightTheme();
+  const size = Math.min(W * 0.54, H * 0.58);
+  const left = (W - size) / 2, top = H * 0.28;
+
+  ctx.fillStyle = light ? 'rgba(255,255,255,.82)' : 'rgba(15,23,42,.68)';
+  ctx.strokeStyle = light ? '#cbd5e1' : '#334155';
+  ctx.lineWidth = 2;
+  ctx.fillRect(left, top, size, size);
+  ctx.strokeRect(left, top, size, size);
+
+  ctx.strokeStyle = light ? 'rgba(100,116,139,.35)' : 'rgba(148,163,184,.45)';
+  ctx.beginPath();
+  ctx.moveTo(left + size / 2, top); ctx.lineTo(left + size / 2, top + size);
+  ctx.moveTo(left, top + size / 2); ctx.lineTo(left + size, top + size / 2);
+  ctx.stroke();
+
+  const xl = s.options?.[0]?.label || 'X 軸';
+  const yl = s.options?.[1]?.label || 'Y 軸';
+  ctx.fillStyle = light ? '#334155' : '#cbd5e1';
+  ctx.font = '700 20px "Noto Sans TC",sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${xl} ▶`, left + size / 2, top + size + 34);
+  ctx.save();
+  ctx.translate(left - 28, top + size / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(`${yl} ▶`, 0, 0);
+  ctx.restore();
+
+  const primary = s.config?.primary_color || '#38bdf8';
+  for (const p of quadParticles) {
+    p.cx += (p.tx - p.cx) * 0.08;
+    p.cy += (p.ty - p.cy) * 0.08;
+    const px = left + p.cx * size;
+    const py = top + (1 - p.cy) * size;
+    ctx.fillStyle = primary + '55';
+    ctx.beginPath(); ctx.arc(px, py, p.r * 2.3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = light ? primary : '#e0f2fe';
+    ctx.beginPath(); ctx.arc(px, py, p.r * 0.75, 0, Math.PI * 2); ctx.fill();
+  }
+
+  if ((s.stats?.totalVotes || 0) > 0) {
+    const ax = left + ((s.stats.avgX || 50) / 100) * size;
+    const ay = top + (1 - (s.stats.avgY || 50) / 100) * size;
+    ctx.strokeStyle = '#f59e0b';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.arc(ax, ay, 18, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = light ? '#d97706' : '#fbbf24';
+    ctx.font = '800 16px "Noto Sans TC",sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`全場重心 (${s.stats.avgX}, ${s.stats.avgY})`, ax + 24, ay + 6);
+  }
+}
+
+function drawTreeMode(s) {
+  const light = isLightTheme();
+  const cx = W / 2, baseY = H * 0.9;
+  const total = s.stats?.totalVotes || 0;
+  const glow = Math.min(1, total / 25);
+
+  ctx.save();
+  ctx.strokeStyle = glow > 0.7 ? '#f59e0b' : (light ? '#64748b' : '#475569');
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = glow * 35;
+  ctx.lineCap = 'round';
+  const branch = (x, y, len, ang, w, depth) => {
+    if (depth === 0) return;
+    const nx = x + Math.cos(ang) * len;
+    const ny = y + Math.sin(ang) * len;
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(nx, ny); ctx.stroke();
+    branch(nx, ny, len * 0.72, ang - 0.42, w * 0.68, depth - 1);
+    branch(nx, ny, len * 0.72, ang + 0.42, w * 0.68, depth - 1);
+  };
+  branch(cx, baseY, Math.min(W, H) * 0.18, -Math.PI / 2, 18, 5);
+  ctx.restore();
+
+  for (let i = treeBeams.length - 1; i >= 0; i--) {
+    const b = treeBeams[i];
+    b.p += 0.035;
+    const x = b.x + (b.tx - b.x) * b.p;
+    const y = b.y + (b.ty - b.y) * b.p;
+    ctx.fillStyle = b.color;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
+    if (b.p >= 1) {
+      treeLeaves.push({ x: b.tx, y: b.ty, color: b.color, text: b.text, r: 0, maxR: 8 + Math.random() * 7 });
+      treeBeams.splice(i, 1);
+    }
+  }
+
+  for (let i = 0; i < treeLeaves.length; i++) {
+    const lf = treeLeaves[i];
+    lf.r += (lf.maxR - lf.r) * 0.1;
+    ctx.save();
+    ctx.shadowColor = lf.color; ctx.shadowBlur = 18;
+    ctx.fillStyle = lf.color;
+    ctx.beginPath(); ctx.arc(lf.x, lf.y, lf.r, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (i >= treeLeaves.length - 8 && lf.text) {
+      ctx.fillStyle = light ? '#0f172a' : 'rgba(248,250,252,.9)';
+      ctx.font = '700 14px "Noto Sans TC",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(lf.text, lf.x, lf.y - lf.r - 8);
+    }
+  }
+}
+
+function drawDanmakuMode() {
+  const light = isLightTheme();
+  for (let i = danmakuItems.length - 1; i >= 0; i--) {
+    const d = danmakuItems[i];
+    d.x -= d.speed;
+    const label = `[${d.tag}] ${d.text}`;
+    ctx.font = '700 22px "Noto Sans TC",sans-serif';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = light ? 'rgba(255,255,255,.92)' : 'rgba(15,23,42,.78)';
+    ctx.strokeStyle = d.color;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(d.x, d.y - 24, tw + 28, 42, 21); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = light ? '#0f172a' : '#f8fafc';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, d.x + 14, d.y + 5);
+    if (d.x + tw + 40 < 0) danmakuItems.splice(i, 1);
+  }
+}
+
+let tick = 0;
+function loop() {
+  tick++;
+  ctx.clearRect(0, 0, W, H);
+  drawBackdrop(tick);
+  if (state && state.mode !== 'SLIDE') {
+    if (state.mode === 'BUBBLE') drawBubbleMode();
+    else if (state.mode === 'SPECTRUM') drawSpectrumMode(state);
+    else if (state.mode === 'MYTH') drawMythMode(state, tick);
+    else if (state.mode === 'QUADRANT') drawQuadrantMode(state);
+    else if (state.mode === 'TREE') drawTreeMode(state);
+    else if (state.mode === 'DANMAKU') drawDanmakuMode();
+  }
+  if (state) renderSlideDOM(state);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function applyState(next) {
+  state = next;
+  offlineMode = false;
+  document.getElementById('offlinePill').style.display = 'none';
+  try { localStorage.setItem('sdi_cached_stage_' + roomId, JSON.stringify(next)); } catch {}
+  applyTheme(next.config);
+  preloadMedia(next.mediaUrls);
+  syncVisualData(next);
+  renderSlideDOM(next);
+}
+
+// Initial state + SSE or Adaptive Polling
+let pollTimer = null;
+async function fetchStageState(withSheet = false) {
+  try {
+    let url = `/api/stage-state?room=${encodeURIComponent(roomId)}`;
+    if (withSheet && sheetParam) url += `&sheet=${encodeURIComponent(sheetParam)}`;
+    if (withSheet && configParam) url += `&config=${encodeURIComponent(configParam)}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    applyState(data);
+  } catch {
+    enableOfflineFallback();
+  }
+}
+
+function enableOfflineFallback() {
+  offlineMode = true;
+  document.getElementById('offlinePill').style.display = 'inline-block';
+  if (!state) {
+    try {
+      const cached = localStorage.getItem('sdi_cached_stage_' + roomId);
+      if (cached) {
+        state = JSON.parse(cached);
+        applyTheme(state.config);
+        syncVisualData(state);
+      }
+    } catch {}
+  }
+}
+
+function startSync() {
+  fetchStageState(true).then(() => {
+    const es = new EventSource(`/api/stream/stage?room=${encodeURIComponent(roomId)}`);
+    es.onmessage = (e) => {
+      try { applyState(JSON.parse(e.data)); } catch {}
+    };
+    es.onerror = () => {
+      es.close();
+      if (!pollTimer) {
+        pollTimer = setInterval(() => fetchStageState(false), 900);
+      }
+    };
+  });
+}
+startSync();
+
+// Offline local simulation helpers
+function offlineAction(action, extra = {}) {
+  if (!state) return;
+  if (action === 'toggleQr') {
+    state.qrVisible = !state.qrVisible;
+  } else if (action === 'adjust' && state.mode !== 'SLIDE') {
+    const key = `opt_${extra.optNum}`;
+    if (!state.stats) state.stats = { totalVotes: 0, counts: {} };
+    state.stats.counts[key] = (state.stats.counts[key] || 0) + (extra.delta || 1);
+    state.stats.totalVotes = (state.stats.totalVotes || 0) + (extra.delta || 1);
+    syncVisualData(state);
+  } else if (action === 'burst' && state.mode !== 'SLIDE') {
+    const opts = state.options || [];
+    for (let i = 0; i < 30; i++) {
+      if (state.mode === 'BUBBLE' || state.mode === 'MYTH') {
+        if (opts.length) {
+          const k = opts[i % opts.length].key;
+          state.stats.counts[k] = (state.stats.counts[k] || 0) + 1;
+          state.stats.totalVotes++;
+        }
+      } else if (state.mode === 'QUADRANT') {
+        state.stats.recentPoints.push({ x: 20 + Math.random() * 60, y: 20 + Math.random() * 60 });
+        state.stats.totalVotes++;
+      } else if (state.mode === 'TREE') {
+        state.stats.recentBlessings.push({ id: 'off_' + i, text: '離線演示 ✨' });
+        state.stats.totalVotes++;
+      }
+    }
+    syncVisualData(state);
+  } else if (action === 'next') {
+    if (state.mode === 'SLIDE' && state.layout === 'BULLETS' && state.subStep < (state.bullets?.length || 0)) {
+      state.subStep++;
+    } else if (state.mode === 'MYTH' && state.phase !== 'REVEALED') {
+      state.phase = state.phase === 'READY' ? 'VOTING' : 'REVEALED';
+    } else {
+      showToast('離線模式：僅支援原頁動畫與 1~5 / B 模擬');
+    }
+  }
+  renderSlideDOM(state);
+}
+
+async function stageAction(action, extra = {}) {
+  if (offlineMode) return offlineAction(action, extra);
+  try {
+    const r = await fetch(`/api/stage/control?room=${encodeURIComponent(roomId)}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-admin-password': presenterToken,
+      },
+      body: JSON.stringify({ roomId, action, ...extra }),
+    });
+    if (r.status === 401) {
+      openPinModal();
+      return;
+    }
+    const d = await r.json();
+    if (!r.ok) {
+      showToast('✕ ' + (d.message || '操作失敗'));
+      return;
+    }
+    if (d.state) applyState(d.state);
+    if (action === 'reload') showToast('✓ 已熱重載最新 Google Sheets 簡報');
+  } catch {
+    offlineAction(action, extra);
+    showToast('⚠ 網路中斷，已切換本機離線模式');
+  }
+}
+
+function toggleOverview(force) {
+  const modal = document.getElementById('overviewModal');
+  const show = force !== undefined ? force : !modal.classList.contains('show');
+  if (show && state?.deckOverview) {
+    document.getElementById('overviewGrid').innerHTML = state.deckOverview.map(item => `
+      <button class="ov-card ${item.index === state.idx ? 'active' : ''}" onclick="stageAction('goto',{index:${item.index}});toggleOverview(false)">
+        <div class="ov-meta"><span>#${item.order} · ${esc(item.mode)}</span><span>${esc(item.layout || '')}</span></div>
+        <div class="ov-title">${esc(item.title)}</div>
+      </button>
+    `).join('');
+  }
+  modal.classList.toggle('show', show);
+}
+
+function openPinModal() {
+  document.getElementById('pinModal').classList.add('show');
+  setTimeout(() => document.getElementById('pinInput').focus(), 50);
+}
+function closePinModal() {
+  document.getElementById('pinModal').classList.remove('show');
+}
+async function submitPin() {
+  const val = document.getElementById('pinInput').value.trim();
+  if (!val) return;
+  const r = await fetch(`/api/admin/login?room=${encodeURIComponent(roomId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roomId, password: val }),
+  });
+  if (r.ok) {
+    presenterToken = val;
+    localStorage.setItem('sdi_stage_token_' + roomId, val);
+    closePinModal();
+    showToast('✓ 已解鎖講師全場同步控場');
+  } else {
+    showToast('✕ 密碼錯誤');
+  }
+}
+document.getElementById('pinInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') submitPin();
+});
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+
+// Presenter Remote & Keyboard State Machine
+window.addEventListener('keydown', (e) => {
+  if (document.getElementById('pinModal').classList.contains('show')) {
+    if (e.key === 'Escape') closePinModal();
+    return;
+  }
+  if (e.key === 'Escape') {
+    toggleOverview(false);
+    return;
+  }
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) {
+    e.preventDefault();
+    stageAction('next');
+  } else if (['ArrowLeft', 'PageUp'].includes(e.key)) {
+    e.preventDefault();
+    stageAction('prev');
+  } else {
+    const k = e.key.toLowerCase();
+    if (k === 'q') stageAction('toggleQr');
+    else if (k === 'o') toggleOverview();
+    else if (k === 'r') stageAction('reload');
+    else if (k === 'b') stageAction('burst', { count: 30 });
+    else if (k === 'f') toggleFullscreen();
+    else if (['1', '2', '3', '4', '5'].includes(k)) {
+      stageAction('adjust', { optNum: Number(k), delta: 1 });
+    }
+  }
+});
+</script>
+</body>
+</html>

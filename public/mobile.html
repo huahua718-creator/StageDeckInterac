@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>隨身講義與即時互動</title>
+<style>
+:root{--primary:#6366f1;--bg:#090f1f;--card:#121b30;--border:#24324d;--text:#f8fafc;--muted:#94a3b8;--ok:#22c55e;--bad:#ef4444;--gold:#f59e0b}
+body.theme-CLEAN_LIGHT{--bg:#f1f5f9;--card:#ffffff;--border:#cbd5e1;--text:#0f172a;--muted:#475569}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100dvh;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans TC","Microsoft JhengHei",sans-serif;display:flex;flex-direction:column}
+.wrap{width:100%;max-width:480px;margin:0 auto;padding:14px 14px 32px;flex:1;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.ev{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.top-r{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.pill{padding:4px 10px;border-radius:999px;background:rgba(99,102,241,.16);color:var(--primary);font-weight:700;font-size:12px}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-right:5px}
+.dot.off{background:var(--gold)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+h1{font-size:20px;line-height:1.38;margin:0 0 8px;font-weight:800}
+.sub{font-size:14px;color:var(--muted);margin:0 0 14px;line-height:1.55}
+.timer{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:rgba(245,158,11,.16);color:#f59e0b;font-weight:700;font-size:13px;margin-bottom:12px}
+.bullet-ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.bullet-ul li{padding:11px 13px;border-radius:12px;border:1px solid var(--border);background:rgba(148,163,184,.06);font-size:15px;line-height:1.5;display:flex;gap:10px}
+.b-idx{width:22px;height:22px;border-radius:7px;background:var(--primary);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.split-blk{padding:12px 14px;border-radius:14px;border:1px solid var(--border);margin-bottom:10px;background:rgba(148,163,184,.05)}
+.split-blk h3{margin:0 0 8px;font-size:15px;color:var(--primary)}
+.quote-box{padding:16px;border-left:4px solid var(--primary);background:rgba(99,102,241,.08);border-radius:0 12px 12px 0;font-size:16px;font-weight:700;line-height:1.55;margin-bottom:10px}
+.media-img{width:100%;max-height:240px;object-fit:contain;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.15)}
+.bm-bar{display:flex;gap:8px;margin-top:14px}
+.bm-btn{flex:1;padding:12px;border-radius:12px;border:1.5px solid var(--border);background:transparent;color:var(--text);font-size:14px;font-weight:700;cursor:pointer}
+.bm-btn.saved{border-color:var(--gold);background:rgba(245,158,11,.15);color:#f59e0b}
+.opts{display:flex;flex-direction:column;gap:10px}
+.opt{width:100%;text-align:left;padding:14px 15px;border-radius:14px;border:1.5px solid var(--border);background:rgba(148,163,184,.06);color:var(--text);font-size:16px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.opt:disabled{opacity:.65;cursor:default}
+.opt.sel{border-color:var(--primary);background:rgba(99,102,241,.18);opacity:1}
+.opt.ok{border-color:var(--ok);background:rgba(34,197,94,.2);opacity:1}
+.opt.bad{border-color:var(--bad);background:rgba(239,68,68,.2);opacity:1}
+.btn{width:100%;padding:14px;border:0;border-radius:14px;background:var(--primary);color:#fff;font-size:16px;font-weight:800;cursor:pointer;margin-top:12px}
+.btn:disabled{opacity:.5;cursor:default}
+.slider-box{border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;background:rgba(148,163,184,.05)}
+.slider-labels{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px;gap:8px}
+.slider-val{text-align:center;font-size:22px;font-weight:800;color:var(--primary);margin-bottom:4px}
+.camp-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.camp-btn{padding:10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--primary);height:26px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.tag{padding:7px 12px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:13px;cursor:pointer}
+.tag.active{border-color:var(--primary);color:var(--primary);background:rgba(99,102,241,.15);font-weight:700}
+textarea,input[type=text]{width:100%;padding:12px 13px;border-radius:13px;border:1.5px solid var(--border);background:rgba(148,163,184,.06);color:var(--text);font-size:16px;font-family:inherit;resize:none}
+.msg{margin-top:12px;padding:11px 13px;border-radius:12px;font-size:14px;line-height:1.5;text-align:center}
+.msg.info{background:rgba(99,102,241,.14);color:var(--primary)}
+.msg.ok{background:rgba(34,197,94,.16);color:#16a34a}
+.msg.bad{background:rgba(239,68,68,.16);color:#ef4444}
+.mini-grid{width:124px;height:124px;margin:10px auto 2px;border:1px solid var(--border);border-radius:10px;position:relative;background:rgba(148,163,184,.06)}
+.mini-grid::before,.mini-grid::after{content:"";position:absolute;background:rgba(148,163,184,.28)}
+.mini-grid::before{left:50%;top:0;bottom:0;width:1px}
+.mini-grid::after{top:50%;left:0;right:0;height:1px}
+.mini-dot{width:12px;height:12px;border-radius:50%;background:var(--primary);position:absolute;transform:translate(-50%,50%)}
+.modal{position:fixed;inset:0;background:rgba(2,6,23,.78);display:none;align-items:flex-end;justify-content:center;z-index:50;padding:12px}
+.modal.show{display:flex}
+.sheet{width:100%;max-width:480px;max-height:82dvh;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px}
+.bm-item{padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <span id="evTitle" class="ev">現場互動講義</span>
+    <div class="top-r">
+      <button id="openNotesBtn" class="pill" style="border:0;cursor:pointer">⭐ <span id="bmCount">0</span></button>
+      <span class="pill"><span id="connDot" class="dot"></span><span id="qBadge">連線中</span></span>
+    </div>
+  </div>
+  <div id="app" class="card">載入簡報中...</div>
+</div>
+
+<div id="notesModal" class="modal">
+  <div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:18px">⭐ 我的研習精華收藏</h2>
+      <button onclick="$('notesModal').classList.remove('show')" style="border:1px solid var(--border);background:transparent;color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer">關閉</button>
+    </div>
+    <div id="bmList"></div>
+    <div class="bm-bar">
+      <button id="copyNotesBtn" class="bm-btn">📋 複製全部筆記</button>
+      <button id="dlNotesBtn" class="bm-btn" style="background:var(--primary);color:#fff;border-color:var(--primary)">📥 匯出 .txt</button>
+    </div>
+    <div id="bmTip" class="msg info" style="display:none"></div>
+  </div>
+</div>
+
+<script>
+const params=new URLSearchParams(location.search);
+const roomId=params.get('room')||'main';
+const UUID_KEY='sdi_uuid';
+let uuid=localStorage.getItem(UUID_KEY);
+if(!uuid){uuid=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));localStorage.setItem(UUID_KEY,uuid);}
+const $=id=>document.getElementById(id);
+const BM_KEY='sdi_bm_'+roomId;
+
+let state=null,lastRenderKey='',pollIv=null,es=null;
+let spectrumVal=50,quadX=50,quadY=50,selectedTag='';
+
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function getBookmarks(){try{return JSON.parse(localStorage.getItem(BM_KEY)||'[]')}catch{return[]}}
+function saveBookmarks(arr){try{localStorage.setItem(BM_KEY,JSON.stringify(arr))}catch{}$('bmCount').textContent=arr.length;}
+function isBookmarked(slideId){return getBookmarks().some(b=>b.slideId===slideId);}
+function toggleBookmark(){
+  if(!state)return;
+  const list=getBookmarks();
+  const idx=list.findIndex(b=>b.slideId===state.slideId);
+  if(idx>=0)list.splice(idx,1);
+  else list.push({slideId:state.slideId,order:state.order,title:state.title,subtitle:state.subtitle,body:state.body,bullets:state.bullets||[]});
+  saveBookmarks(list);
+  lastRenderKey='';render();
+}
+function getVoted(slideId){try{return JSON.parse(localStorage.getItem('sdi_v_'+roomId+'_'+slideId)||'null')}catch{return null}}
+function setVoted(slideId,val){try{localStorage.setItem('sdi_v_'+roomId+'_'+slideId,JSON.stringify(val))}catch{}}
+
+async function postVote(payload){
+  const res=await fetch('/api/vote?room='+encodeURIComponent(roomId),{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({roomId,slideId:state.slideId,order:state.order,uuid,payload})
+  });
+  return res.json();
+}
+
+function updateTimer(){
+  const el=$('timerEl');
+  if(!el||!state||!state.timerEndsAt)return;
+  const rem=Math.max(0,Math.ceil((state.timerEndsAt-Date.now())/1000));
+  el.textContent='⏱ 剩餘 '+rem+' 秒';
+}
+
+function render(){
+  if(!state)return;
+  const cfg=state.config||{};
+  document.documentElement.style.setProperty('--primary',cfg.primary_color||'#6366f1');
+  document.body.className='theme-'+(cfg.bg_theme||'DARK_NEBULA');
+  $('evTitle').textContent=cfg.event_title||'現場互動講義';
+  $('qBadge').textContent=`第 ${state.idx+1} / ${state.total||1} 頁`;
+  $('bmCount').textContent=getBookmarks().length;
+
+  const voted=getVoted(state.slideId);
+  const bm=isBookmarked(state.slideId);
+  const key=[state.slideId,state.mode,state.layout,state.phase,state.timerEndsAt,state.correctOpt||'',voted?JSON.stringify(voted):'',bm].join('|');
+  if(lastRenderKey===key)return;
+  lastRenderKey=key;
+
+  let html=`<h1>${esc(state.title)}</h1>`;
+  if(state.subtitle)html+=`<p class="sub">${esc(state.subtitle)}</p>`;
+
+  if(state.mode==='SLIDE'){
+    const layout=state.layout||'BULLETS';
+    if(layout==='QUOTE'){
+      const parts=state.bullets?.length?state.bullets:(state.body?[state.body]:[]);
+      html+=parts.map(p=>`<div class="quote-box">${esc(p)}</div>`).join('');
+    }else if(layout==='SPLIT'){
+      const l=state.columns?.left||[],r=state.columns?.right||[];
+      const blk=(arr,lbl)=>arr.length?`<div class="split-blk"><h3>${esc(lbl)}</h3><ul class="bullet-ul">${arr.map((x,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(x)}</span></li>`).join('')}</ul></div>`:'';
+      html+=blk(l,'左側觀點')+blk(r,'右側觀點');
+    }else if(layout==='MEDIA'){
+      if(state.mediaUrl)html+=`<img class="media-img" src="${esc(state.mediaUrl)}" alt="簡報圖解">`;
+      if(state.body)html+=`<p class="sub" style="margin-top:10px">${esc(state.body)}</p>`;
+    }else if(state.bullets?.length){
+      html+=`<ul class="bullet-ul">${state.bullets.map((b,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(b)}</span></li>`).join('')}</ul>`;
+    }else if(state.body){
+      html+=`<div class="msg info" style="text-align:left">${esc(state.body)}</div>`;
+    }
+    html+=`<div class="bm-bar">
+      <button id="bmToggleBtn" class="bm-btn ${bm?'saved':''}">${bm?'★ 已收藏本頁重點':'☆ 收藏本頁重點'}</button>
+      <button id="bmOpenBtn" class="bm-btn">📥 匯出筆記</button>
+    </div>`;
+  }else{
+    const locked=state.phase!=='VOTING';
+    if(state.timerEndsAt&&state.phase==='VOTING')html+=`<div id="timerEl" class="timer">⏱ 倒數中</div>`;
+
+    if(state.mode==='BUBBLE'||state.mode==='MYTH'){
+      if(state.mode==='MYTH'&&state.phase==='READY'){
+        html+=`<div class="msg info">⏳ 準備就緒，請看大螢幕，等待講者開啟作答…</div>`;
+      }else{
+        html+='<div class="opts">';
+        for(const o of (state.options||[])){
+          let cls='opt',badge='';
+          if(voted&&voted.optKey===o.key){cls+=' sel';badge='✓ 已選';}
+          if(state.mode==='MYTH'&&state.phase==='REVEALED'){
+            if(o.key===state.correctOpt){cls+=' ok';badge='✅ 正解';}
+            else if(voted&&voted.optKey===o.key){cls+=' bad';badge='✕';}
+          }
+          html+=`<button class="${cls}" data-opt="${esc(o.key)}" ${(locked||voted)?'disabled':''}><span>${esc(o.label)}</span><span>${badge}</span></button>`;
+        }
+        html+='</div>';
+        if(state.mode==='MYTH'&&state.phase==='REVEALED'){
+          const isOk=voted&&voted.optKey===state.correctOpt;
+          html+=`<div class="msg ${voted?(isOk?'ok':'bad'):'info'}">${voted?(isOk?'🎉 恭喜答對！':'💡 差一點點！'):'答案已揭曉'}${state.explanation?'<br>'+esc(state.explanation):''}</div>`;
+        }else if(voted){
+          html+=`<div class="msg ok">✓ 已送出作答，請看大螢幕即時結果！</div>`;
+        }else if(locked){
+          html+=`<div class="msg info">⏸ 本題已截止作答</div>`;
+        }
+      }
+    }else if(state.mode==='SPECTRUM'){
+      const left=state.options?.[0]?.label||'左端',right=state.options?.[1]?.label||'右端';
+      const cur=voted?voted.score:spectrumVal;
+      html+=`<div class="slider-box">
+        <div class="slider-labels"><span>◀ ${esc(left)}</span><span>${esc(right)} ▶</span></div>
+        <div id="spVal" class="slider-val">${cur}</div>
+        <input id="spRange" type="range" min="0" max="100" value="${cur}" ${(locked||voted)?'disabled':''}>
+      </div>`;
+      if(!voted&&!locked){
+        html+=`<div class="camp-row"><button type="button" class="camp-btn" id="campL">◀ 偏向左端 (15)</button><button type="button" class="camp-btn" id="campR">偏向右端 (85) ▶</button></div>`;
+        html+=`<button id="spSend" class="btn">送出我的立場</button>`;
+      }else if(voted)html+=`<div class="msg ok">✓ 已送出立場（傾向值 ${voted.score}）</div>`;
+      else html+=`<div class="msg info">⏸ 本題已截止</div>`;
+    }else if(state.mode==='QUADRANT'){
+      const xl=state.options?.[0]?.label||'X 軸',yl=state.options?.[1]?.label||'Y 軸';
+      const cx=voted?voted.x:quadX,cy=voted?voted.y:quadY;
+      html+=`<div class="slider-box">
+        <div class="slider-labels"><span>${esc(xl)}</span><span id="qxLbl">${cx}</span></div>
+        <input id="qxRange" type="range" min="0" max="100" value="${cx}" ${(locked||voted)?'disabled':''}>
+        <div class="slider-labels" style="margin-top:8px"><span>${esc(yl)}</span><span id="qyLbl">${cy}</span></div>
+        <input id="qyRange" type="range" min="0" max="100" value="${cy}" ${(locked||voted)?'disabled':''}>
+        <div class="mini-grid"><div id="miniDot" class="mini-dot" style="left:${cx}%;bottom:${cy}%"></div></div>
+      </div>`;
+      if(!voted&&!locked)html+=`<button id="qdSend" class="btn">送出我的座標落點</button>`;
+      else if(voted)html+=`<div class="msg ok">✓ 已送出落點 (${voted.x}, ${voted.y})</div>`;
+      else html+=`<div class="msg info">⏸ 本題已截止</div>`;
+    }else if(state.mode==='TREE'){
+      if(!voted&&!locked){
+        html+=`<input id="treeTxt" type="text" maxlength="20" placeholder="寫下短句（限20字，可留空直接注入能量）">
+        <button id="treeSend" class="btn">🌟 注入能量・點亮願景樹</button>`;
+      }else if(voted)html+=`<div class="msg ok">✨ 感謝注入能量！「${esc(voted.text)}」</div>`;
+      else html+=`<div class="msg info">⏸ 本題已截止</div>`;
+    }else if(state.mode==='DANMAKU'){
+      const tags=(state.options&&state.options.length)?state.options.map(o=>o.label):['許願','提問','心得'];
+      if(!selectedTag||!tags.includes(selectedTag))selectedTag=tags[0];
+      html+=`<div class="tags">${tags.map(t=>`<button type="button" class="tag ${t===selectedTag?'active':''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <textarea id="dmTxt" rows="3" maxlength="60" placeholder="輸入留言或提問（限60字）" ${locked?'disabled':''}></textarea>
+      <button id="dmSend" class="btn" ${locked?'disabled':''}>🚀 發送至大螢幕彈幕</button><div id="dmMsg"></div>`;
+    }
+  }
+
+  $('app').innerHTML=html;
+  bindEvents();
+  updateTimer();
+}
+
+function bindEvents(){
+  const bmT=$('bmToggleBtn'),bmO=$('bmOpenBtn');
+  if(bmT)bmT.onclick=toggleBookmark;
+  if(bmO)bmO.onclick=openNotesModal;
+
+  $('app').querySelectorAll('[data-opt]').forEach(btn=>{
+    btn.onclick=async()=>{
+      const optKey=btn.dataset.opt;
+      $('app').querySelectorAll('[data-opt]').forEach(b=>b.disabled=true);
+      const r=await postVote({optKey});
+      if(r.ok||r.code==='DUPLICATE'){setVoted(state.slideId,{optKey});lastRenderKey='';render();}
+      else{alert(r.message||'送出失敗');lastRenderKey='';render();}
+    };
+  });
+
+  const spRange=$('spRange'),spVal=$('spVal'),spSend=$('spSend');
+  if(spRange){
+    const setSp=v=>{spectrumVal=v;spRange.value=v;spVal.textContent=v;};
+    spRange.oninput=()=>setSp(Number(spRange.value));
+    if($('campL'))$('campL').onclick=()=>setSp(15);
+    if($('campR'))$('campR').onclick=()=>setSp(85);
+    if(spSend)spSend.onclick=async()=>{
+      spSend.disabled=true;
+      const r=await postVote({score:spectrumVal});
+      if(r.ok||r.code==='DUPLICATE'){setVoted(state.slideId,{score:spectrumVal});lastRenderKey='';render();}
+      else{alert(r.message);spSend.disabled=false;}
+    };
+  }
+
+  const qx=$('qxRange'),qy=$('qyRange'),qdSend=$('qdSend');
+  if(qx&&qy){
+    const sync=()=>{
+      quadX=Number(qx.value);quadY=Number(qy.value);
+      $('qxLbl').textContent=quadX;$('qyLbl').textContent=quadY;
+      $('miniDot').style.left=quadX+'%';$('miniDot').style.bottom=quadY+'%';
+    };
+    qx.oninput=sync;qy.oninput=sync;
+    if(qdSend)qdSend.onclick=async()=>{
+      qdSend.disabled=true;
+      const r=await postVote({x:quadX,y:quadY});
+      if(r.ok||r.code==='DUPLICATE'){setVoted(state.slideId,{x:quadX,y:quadY});lastRenderKey='';render();}
+      else{alert(r.message);qdSend.disabled=false;}
+    };
+  }
+
+  const treeSend=$('treeSend');
+  if(treeSend)treeSend.onclick=async()=>{
+    treeSend.disabled=true;
+    const text=($('treeTxt').value||'').trim().slice(0,20)||'點亮願景燈火 ✨';
+    const r=await postVote({text});
+    if(r.ok||r.code==='DUPLICATE'){setVoted(state.slideId,{text});lastRenderKey='';render();}
+    else{alert(r.message);treeSend.disabled=false;}
+  };
+
+  $('app').querySelectorAll('[data-tag]').forEach(t=>{
+    t.onclick=()=>{
+      selectedTag=t.dataset.tag;
+      $('app').querySelectorAll('[data-tag]').forEach(x=>x.classList.toggle('active',x.dataset.tag===selectedTag));
+    };
+  });
+  const dmSend=$('dmSend');
+  if(dmSend)dmSend.onclick=async()=>{
+    const txt=($('dmTxt').value||'').trim();
+    if(!txt)return;
+    dmSend.disabled=true;
+    const r=await postVote({tag:selectedTag,text:txt});
+    if(r.ok){
+      $('dmTxt').value='';
+      $('dmMsg').innerHTML='<div class="msg ok">✓ 已送出至大螢幕！</div>';
+      setTimeout(()=>{dmSend.disabled=false;},3000);
+    }else{
+      $('dmMsg').innerHTML=`<div class="msg bad">${esc(r.message)}</div>`;
+      dmSend.disabled=false;
+    }
+  };
+}
+
+function buildNotesText(){
+  const list=getBookmarks();
+  if(!list.length)return '';
+  const title=state?.config?.event_title||'研習講座精華筆記';
+  return `【${title}】個人收藏筆記\n`+'='.repeat(28)+'\n\n'+list.map(b=>{
+    const lines=b.bullets?.length?b.bullets.map(x=>'  • '+x).join('\n'):(b.body?'  '+b.body:'');
+    return `[#${b.order}] ${b.title}${b.subtitle?'\n  '+b.subtitle:''}${lines?'\n'+lines:''}`;
+  }).join('\n\n');
+}
+
+function openNotesModal(){
+  const list=getBookmarks();
+  $('bmList').innerHTML=list.length?list.map(b=>`
+    <div class="bm-item">
+      <div style="font-weight:800;margin-bottom:4px">#${b.order} ${esc(b.title)}</div>
+      ${b.bullets?.length?b.bullets.map(x=>`<div style="color:var(--muted);font-size:13px">• ${esc(x)}</div>`).join(''):`<div style="color:var(--muted);font-size:13px">${esc(b.body||b.subtitle)}</div>`}
+    </div>`).join(''):'<p class="sub">尚未收藏任何頁面，在簡報頁點擊「☆ 收藏本頁重點」即可加入！</p>';
+  $('bmTip').style.display='none';
+  $('notesModal').classList.add('show');
+}
+$('openNotesBtn').onclick=openNotesModal;
+$('copyNotesBtn').onclick=async()=>{
+  const txt=buildNotesText();
+  if(!txt)return;
+  await navigator.clipboard?.writeText(txt);
+  $('bmTip').textContent='✓ 已複製到剪貼簿！';
+  $('bmTip').style.display='block';
+};
+$('dlNotesBtn').onclick=()=>{
+  const txt=buildNotesText();
+  if(!txt)return;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));
+  a.download='lecture-notes.txt';
+  a.click();
+};
+
+function applyState(next){
+  if(!state||next.v!==state.v||next.slideId!==state.slideId||next.phase!==state.phase){
+    state=next;render();
+  }
+}
+
+function startSync(){
+  fetch('/api/state?room='+encodeURIComponent(roomId)).then(r=>r.json()).then(applyState).catch(()=>{});
+  es=new EventSource('/api/stream/mobile?room='+encodeURIComponent(roomId));
+  es.onopen=()=>{connDot.classList.remove('off');if(pollIv){clearInterval(pollIv);pollIv=null;}};
+  es.onmessage=e=>{try{applyState(JSON.parse(e.data));}catch{}};
+  es.onerror=()=>{
+    es.close();
+    connDot.classList.add('off');
+    if(!pollIv){
+      pollIv=setInterval(async()=>{
+        try{
+          const r=await fetch('/api/state?room='+encodeURIComponent(roomId));
+          if(r.ok){connDot.classList.remove('off');applyState(await r.json());}
+        }catch{connDot.classList.add('off');}
+      },1500);
+    }
+  };
+}
+setInterval(updateTimer,500);
+$('bmCount').textContent=getBookmarks().length;
+startSync();
+</script>
+</body>
+</html>

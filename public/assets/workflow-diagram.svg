@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 680" width="1280" height="680">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b132b"/>
+      <stop offset="100%" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="card1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#a855f7"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="680" rx="28" fill="url(#bg)"/>
+  <g stroke="#334155" stroke-opacity="0.35" stroke-width="1">
+    <path d="M0 120 H1280 M0 240 H1280 M0 360 H1280 M0 480 H1280 M0 600 H1280"/>
+    <path d="M160 0 V680 M320 0 V680 M480 0 V680 M640 0 V680 M800 0 V680 M960 0 V680 M1120 0 V680"/>
+  </g>
+
+  <text x="640" y="72" text-anchor="middle" fill="#f8fafc" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" font-size="30" font-weight="800">AI 教師工作流自動化閉環：Input → Orchestration → Output</text>
+  <text x="640" y="108" text-anchor="middle" fill="#94a3b8" font-family="Noto Sans TC, Microsoft JhengHei, sans-serif" font-size="18">Zero-Code 設定分離 × 即時互動 × 零排版負擔</text>
+
+  <!-- Step 1: Input -->
+  <rect x="70" y="165" width="320" height="390" rx="24" fill="url(#card1)" stroke="#38bdf8" stroke-width="2.5"/>
+  <rect x="100" y="195" width="110" height="32" rx="16" fill="#0ea5e9" fill-opacity="0.2" stroke="#38bdf8"/>
+  <text x="155" y="217" text-anchor="middle" fill="#7dd3fc" font-family="sans-serif" font-size="15" font-weight="700">01 · INPUT</text>
+  <text x="100" y="268" fill="#f8fafc" font-family="Noto Sans TC, sans-serif" font-size="26" font-weight="800">資料與腳本來源</text>
+  <g fill="#cbd5e1" font-family="Noto Sans TC, sans-serif" font-size="18">
+    <rect x="100" y="300" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="122" y="335">📊 Google Sheets 腳本</text>
+    <rect x="100" y="374" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="122" y="409">📝 課堂學習單 / 表單</text>
+    <rect x="100" y="448" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="122" y="483">📱 觀眾手機即時回饋</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <path d="M398 360 H468" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" filter="url(#glow)"/>
+  <polygon points="466,348 488,360 466,372" fill="#6366f1"/>
+
+  <!-- Step 2: Engine -->
+  <rect x="492" y="145" width="296" height="430" rx="26" fill="url(#card1)" stroke="#818cf8" stroke-width="3" filter="url(#glow)"/>
+  <rect x="522" y="178" width="140" height="32" rx="16" fill="#6366f1" fill-opacity="0.25" stroke="#818cf8"/>
+  <text x="592" y="200" text-anchor="middle" fill="#c7d2fe" font-family="sans-serif" font-size="15" font-weight="700">02 · AI ENGINE</text>
+  <text x="522" y="252" fill="#ffffff" font-family="Noto Sans TC, sans-serif" font-size="26" font-weight="800">智慧引擎與狀態機</text>
+  <circle cx="640" cy="356" r="68" fill="#4f46e5" fill-opacity="0.22" stroke="#818cf8" stroke-width="2.5"/>
+  <text x="640" y="348" text-anchor="middle" fill="#e0e7ff" font-family="Noto Sans TC, sans-serif" font-size="20" font-weight="800">自動化流程</text>
+  <text x="640" y="378" text-anchor="middle" fill="#a5b4fc" font-family="sans-serif" font-size="15">CSV 快取 + 即時同步</text>
+  <text x="640" y="465" text-anchor="middle" fill="#cbd5e1" font-family="Noto Sans TC, sans-serif" font-size="17">• 無需改程式碼即可換題</text>
+  <text x="640" y="497" text-anchor="middle" fill="#cbd5e1" font-family="Noto Sans TC, sans-serif" font-size="17">• 簡報筆統一推進狀態</text>
+  <text x="640" y="529" text-anchor="middle" fill="#cbd5e1" font-family="Noto Sans TC, sans-serif" font-size="17">• 冪等去重 × 離線降級</text>
+
+  <!-- Arrow 2 -->
+  <path d="M796 360 H866" stroke="url(#accent)" stroke-width="6" stroke-linecap="round" filter="url(#glow)"/>
+  <polygon points="864,348 886,360 864,372" fill="#a855f7"/>
+
+  <!-- Step 3: Output -->
+  <rect x="890" y="165" width="320" height="390" rx="24" fill="url(#card1)" stroke="#a855f7" stroke-width="2.5"/>
+  <rect x="920" y="195" width="120" height="32" rx="16" fill="#a855f7" fill-opacity="0.2" stroke="#c084fc"/>
+  <text x="980" y="217" text-anchor="middle" fill="#e9d5ff" font-family="sans-serif" font-size="15" font-weight="700">03 · OUTPUT</text>
+  <text x="920" y="268" fill="#f8fafc" font-family="Noto Sans TC, sans-serif" font-size="26" font-weight="800">雙端即時呈現</text>
+  <g fill="#cbd5e1" font-family="Noto Sans TC, sans-serif" font-size="18">
+    <rect x="920" y="300" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="942" y="335">🖥 大螢幕 60FPS 互動</text>
+    <rect x="920" y="374" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="942" y="409">⭐ 手機隨身講義＋筆記</text>
+    <rect x="920" y="448" width="260" height="58" rx="12" fill="#1e293b" stroke="#334155"/>
+    <text x="942" y="483">🎛 控場提詞與彈幕聚焦</text>
+  </g>
+
+  <text x="640" y="635" text-anchor="middle" fill="#64748b" font-family="Noto Sans TC, sans-serif" font-size="16">StageDeckInteract — Configuration-Driven Presentation &amp; Realtime Engagement Engine</text>
+</svg>
