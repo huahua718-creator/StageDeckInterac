@@ -6,12 +6,15 @@
 
 ## 一、 核心功能特色
 
-1. **五大內建簡報版型 (`SLIDE`)**：
+1. **八大內建簡報版型 (`SLIDE`)**：
    - `COVER`：封面與開場版型（右側內建高對比大型 QR Code 卡片）
    - `QUOTE`：金句引言版型（支援 `|` 分隔原文與翻譯）
    - `BULLETS`：漸進式條列版型（按簡報筆逐點淡入展開，全數展開後自動切下一頁）
    - `SPLIT`：雙欄對比版型（`::` 分隔左右兩欄，欄內支援 `|` 條列）
    - `MEDIA`：全幅圖解版型（自動轉換 Google Drive 分享連結為直連圖片並預載）
+   - `DIAGRAM`：**Mermaid 即時向量繪圖**（流程圖、心智圖、時序圖，免截圖自動適配深淺色主題）
+   - `CHART`：**動態數據圖表引擎**（支援 `bar` 長條圖、`pie`/`donut` 圓餅圖、`line` 折線圖、`radar` 雷達圖）
+   - `CARDS`：**結構化資訊圖卡**（自動排版 3~4 步驟流程卡與對比卡片）
 2. **六大 60 FPS 即時互動視覺模組**：
    - `BUBBLE`：物理碰撞氣泡圖（彈性碰撞、半徑依票數開根號膨脹、第一名皇冠光環）
    - `SPECTRUM`：理念天平 / 雙向拔河（連續傾向滑桿與即時傾斜天平）
@@ -63,20 +66,24 @@ npm run load-test
 
 ---
 
-## 四、 未來如何匯入與切換新的講題主軸（Zero-Code 三種方式）
+## 四、 未來如何匯入與切換新的講題主軸（NotebookLM × Google Drive 支援）
 
-### 方式 1：Google Sheets 雲端熱重載（最推薦）
-1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv` 匯入 Google 試算表。
-2. 於 Google 試算表修改 `Config`（標題、主色票 `#6366f1`、背景主題 `DARK_NEBULA`/`CLEAN_LIGHT`/`TECH_GRID`）與 `Deck`（第 1~N 頁內容與 `speaker_note`）。
-3. 點選 **「檔案 → 共享 → 發布到網路」**，格式選擇 **「逗號分隔值 (.csv)」**，複製連結。
-4. 在 `/admin` 貼上連結點擊 **「🔄 熱重載更新」**，或直接使用帶參數網址開場：
+### 方式 1：NotebookLM → Google Docs / Google Drive 雲端直抓（最推薦、免調格式）
+1. 進入 `/admin` 點選 **「✨ 複製 NotebookLM 專用提示詞」** 並貼進 NotebookLM。
+2. 將 NotebookLM 產出的 Markdown 內容 **匯出到 Google 文件**（或存成 `.md` / `.json` / `.csv` 放入 Google Drive），並設定為 **「知道連結者可檢視」**。
+3. 複製連結貼入 `/admin` 點擊 **「🔄 熱重載更新」**，系統會自動抓取並即時渲染 `DIAGRAM`（Mermaid 流程圖）、`CHART`（數據圖表）、`CARDS`（流程卡片）與六大互動題型！
+
+### 方式 2：Google Sheets 雲端熱重載
+1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv` 匯入 Google 試算表，依需求修改 `Config` 與 `Deck`。
+2. 點選 **「檔案 → 共享 → 發布到網路」**，格式選擇 **「逗號分隔值 (.csv)」**，複製連結。
+3. 在 `/admin` 貼上連結點擊 **「🔄 熱重載更新」**，或直接使用帶參數網址開場：
    - `https://stagedeckinterac.vercel.app/?room=場次名稱&sheet=編碼後的CSV網址`
 
-### 方式 2：在 `/admin` 直接上傳本機 `.csv` 檔
-* 無需公開發布 Google Sheets，在 Excel / Google Sheets 編輯好並「下載為 `.csv`」後，於 `/admin` 介面直接選檔並點擊 **「📤 匯入 CSV 檔」** 即可即時同步至該房間（存入 Upstash Redis）。
+### 方式 3：在 `/admin` 直接上傳本機 `.md` / `.csv` / `.json` 檔
+* 在電腦端編輯好檔案後，於 `/admin` 介面選取檔案點擊 **「📤 匯入檔案」** 即可即時同步至該房間（存入 Upstash Redis）。
 
-### 方式 3：新增內建主題範本（`data/decks/`）
-* 將 `<topic>.csv` 與 `<topic>.config.csv` 放入 `data/decks/` 資料夾（例如內建的 `parent-orientation.csv`），部署後即可在 `/admin` 下拉選單一鍵切換，或透過 `/?room=demo&preset=<topic>` 直接開啟。
+### 方式 4：新增內建主題範本（`data/decks/`）
+* 將 `<topic>.md` 或 `<topic>.csv` 放入 `data/decks/` 資料夾（內建 `notebooklm-showcase.md` 與 `parent-orientation.csv`），部署後即可在 `/admin` 下拉選單一鍵切換，或透過 `/?room=demo&preset=<topic>` 直接開啟。
 
 ---
 

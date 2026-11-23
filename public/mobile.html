@@ -169,6 +169,17 @@ function render(){
     }else if(layout==='MEDIA'){
       if(state.mediaUrl)html+=`<img class="media-img" src="${esc(state.mediaUrl)}" alt="簡報圖解">`;
       if(state.body)html+=`<p class="sub" style="margin-top:10px">${esc(state.body)}</p>`;
+    }else if(layout==='DIAGRAM'){
+      html+=`<div class="msg info" style="text-align:left">📊 本頁包含架構圖解，請觀看大螢幕視覺呈現。</div>`;
+      if(state.diagramCode)html+=`<pre style="white-space:pre-wrap;font-size:12px;color:var(--muted);padding:10px;border:1px solid var(--border);border-radius:10px;overflow:auto">${esc(state.diagramCode)}</pre>`;
+    }else if(layout==='CHART'){
+      const items=state.chartSpec?.items||[];
+      const unit=state.chartSpec?.unit||'';
+      const maxV=Math.max(1,...items.map(i=>i.value));
+      html+=items.map(i=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;margin-bottom:4px"><span>${esc(i.label)}</span><span>${i.value}${esc(unit)}</span></div><div style="height:10px;border-radius:99px;background:rgba(148,163,184,.2);overflow:hidden"><div style="height:100%;width:${Math.round((Math.max(0,i.value)/maxV)*100)}%;background:var(--primary)"></div></div></div>`).join('');
+    }else if(layout==='CARDS'){
+      const cards=state.cardsSpec?.cards||[];
+      html+=cards.map((c,i)=>`<div class="split-blk"><h3>${esc((c.tag?c.tag+' · ':'')+c.title)}</h3>${c.desc?`<div style="font-size:14px;color:var(--muted)">${esc(c.desc)}</div>`:''}</div>`).join('');
     }else if(state.bullets?.length){
       html+=`<ul class="bullet-ul">${state.bullets.map((b,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(b)}</span></li>`).join('')}</ul>`;
     }else if(state.body){

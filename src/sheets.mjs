@@ -22,6 +22,9 @@ export const VALID_LAYOUTS = new Set([
   'BULLETS',
   'SPLIT',
   'MEDIA',
+  'DIAGRAM',
+  'CHART',
+  'CARDS',
 ]);
 
 export const VALID_THEMES = new Set([
@@ -32,7 +35,7 @@ export const VALID_THEMES = new Set([
 
 export const DEFAULT_CONFIG = {
   event_title: '用 AI 改善工作流──邁向優雅的教師生活',
-  event_subtitle: '個人研習互動式講座 × 千人現場即時互動系統',
+  event_subtitle: '高中教師增能研習工作坊',
   primary_color: '#6366f1',
   bg_theme: 'DARK_NEBULA',
   logo_url: '',
@@ -41,7 +44,6 @@ export const DEFAULT_CONFIG = {
 
 /**
  * Parse RFC 4180 CSV text into an array of row arrays.
- * Handles UTF-8 BOM, CRLF/LF, and quoted fields with commas/newlines.
  */
 export function parseCSV(text) {
   const clean = String(text || '').replace(/^\uFEFF/, '');
@@ -92,11 +94,28 @@ export function parseCSV(text) {
 }
 
 /**
- * Normalize a Google Sheets URL to a CSV export URL when possible.
+ * Normalize Google Sheets, Google Docs, or Google Drive file URLs into direct raw download URLs.
  */
 export function normalizeSheetCsvUrl(rawUrl, sheetName = '') {
   const trimmed = String(rawUrl || '').trim();
   if (!trimmed) return '';
+
+  // Google Docs -> plain text / markdown export
+  const docMatch = trimmed.match(/https?:\/\/docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]+)/);
+  if (docMatch) {
+    return `https://docs.google.com/document/d/${docMatch[1]}/export?format=txt`;
+  }
+
+  // Google Drive file link -> direct download
+  const driveFileMatch = trimmed.match(/https?:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveFileMatch) {
+    return `https://drive.google.com/uc?export=download&id=${driveFileMatch[1]}`;
+  }
+  const driveOpenMatch = trimmed.match(/https?:\/\/drive\.google\.com\/(?:open|uc)\?.*[?&]?id=([a-zA-Z0-9_-]+)/);
+  if (driveOpenMatch) {
+    return `https://drive.google.com/uc?export=download&id=${driveOpenMatch[1]}`;
+  }
+
   if (
     !sheetName &&
     (trimmed.includes('output=csv') ||
@@ -194,6 +213,152 @@ export function splitBodyColumns(body) {
 }
 
 /**
+ * Parse CHART body text into { chartType, unit, items: [{ label, value }] }.
+ */
+export function parseChartSpec(body) {
+  const raw = String(body || '').replace(/\\n/g, '\n');
+  const lines = raw
+    .split(/\n|\|/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let chartType = 'bar';
+  let unit = '';
+  const items = [];
+
+  for (const line of lines) {
+    const clean = line.replace(/^[-*•]\s*/, '');
+    const mType = clean.match(/^type\s*[:：]\s*(bar|pie|donut|line|radar)$/i);
+    if (mType) {
+      chartType = mType[1].toLowerCase();
+      continue;
+    }
+    const mUnit = clean.match(/^unit\s*[:：]\s*(.+)$/i);
+    if (mUnit) {
+      unit = mUnit[1].trim();
+      continue;
+    }
+    const kv = clean.match(/^(.+?)\s*[:：]\s*(-?\d+(?:\.\d+)?)\s*(.*)$/);
+    if (kv) {
+      const label = kv[1].trim();
+      const value = Number.parseFloat(kv[2]);
+      if (label && Number.isFinite(value)) {
+        if (!unit && kv[3]) unit = kv[3].trim();
+        items.push({ label, value });
+      }
+    }
+  }
+  return { chartType, unit, items };
+}
+
+/**
+ * Parse CARDS body text into { flow, cards: [{ tag, title, desc }] }.
+ */
+export function parseCardsSpec(body, flowFlag = false) {
+  const raw = String(body || '').replace(/\\n/g, '\n');
+  let flow = Boolean(flowFlag);
+  let chunks = [];
+
+  if (raw.includes('::')) {
+    chunks = raw.split('::').map((s) => s.trim()).filter(Boolean);
+  } else {
+    chunks = raw.split(/\n/).map((s) => s.trim()).filter(Boolean);
+  }
+
+  const cards = [];
+  for (const chunk of chunks) {
+    const clean = chunk.replace(/^[-*•]\s*/, '').trim();
+    if (!clean) continue;
+    if (/^flow\s*[:：]\s*(true|yes|1)$/i.test(clean)) {
+      flow = true;
+      continue;
+    }
+    const parts = clean.split('|').map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 3) {
+      cards.push({ tag: parts[0], title: parts[1], desc: parts.slice(2).join(' · ') });
+    } else if (parts.length === 2) {
+      cards.push({ tag: '', title: parts[0], desc: parts[1] });
+    } else if (parts.length === 1) {
+      cards.push({ tag: '', title: parts[0], desc: '' });
+    }
+  }
+  return { flow, cards };
+}
+
+function buildSlideObject({
+  order,
+  mode,
+  layout,
+  title,
+  subtitle,
+  body,
+  mediaUrl,
+  options,
+  correctOpt,
+  explanation,
+  timerSec,
+  speakerNote,
+  diagramCode = '',
+  chartSpec = null,
+  cardsSpec = null,
+  rIdx = 1,
+}) {
+  const cleanBody = String(body || '').replace(/\\n/g, '\n');
+  const normMode = String(mode || 'SLIDE').toUpperCase();
+  let normLayout = '';
+  if (normMode === 'SLIDE') {
+    const up = String(layout || '').toUpperCase();
+    normLayout = VALID_LAYOUTS.has(up) ? up : 'BULLETS';
+  }
+
+  const bullets =
+    normMode === 'SLIDE' && (normLayout === 'BULLETS' || normLayout === 'QUOTE')
+      ? splitBodyBullets(cleanBody)
+      : [];
+  const columns =
+    normMode === 'SLIDE' && normLayout === 'SPLIT'
+      ? splitBodyColumns(cleanBody)
+      : { left: [], right: [] };
+
+  let resolvedDiagram = diagramCode;
+  if (normMode === 'SLIDE' && normLayout === 'DIAGRAM' && !resolvedDiagram) {
+    const m = cleanBody.match(/```(?:mermaid)?\s*\n([\s\S]*?)```/i);
+    resolvedDiagram = m ? m[1].trim() : cleanBody.trim();
+  }
+
+  const resolvedChart =
+    normMode === 'SLIDE' && normLayout === 'CHART'
+      ? chartSpec || parseChartSpec(cleanBody)
+      : null;
+
+  const resolvedCards =
+    normMode === 'SLIDE' && normLayout === 'CARDS'
+      ? cardsSpec || parseCardsSpec(cleanBody)
+      : null;
+
+  return {
+    id: `s_${order}_${normMode}_${rIdx}`,
+    order,
+    mode: normMode,
+    layout: normLayout,
+    title,
+    subtitle,
+    body: cleanBody,
+    bullets,
+    columns,
+    diagramCode: resolvedDiagram,
+    chartSpec: resolvedChart,
+    cardsSpec: resolvedCards,
+    mediaUrl: normalizeMediaUrl(mediaUrl),
+    options,
+    correctOpt,
+    explanation,
+    timerSec,
+    speakerNote,
+  };
+}
+
+/**
  * Convert parsed CSV rows into structured Deck slides and inline Config overrides.
  */
 export function rowsToDeck(rows) {
@@ -223,7 +388,6 @@ export function rowsToDeck(rows) {
     const mode = get(r, 'mode').toUpperCase();
     const title = get(r, 'title');
 
-    // Allow inline CONFIG rows inside a single-sheet Deck CSV
     if (mode === 'CONFIG') {
       const key = (get(r, 'layout') || title || '').toLowerCase();
       const val = get(r, 'body') || get(r, 'subtitle') || '';
@@ -237,43 +401,30 @@ export function rowsToDeck(rows) {
 
     const orderNum = Number.parseInt(get(r, 'order'), 10);
     const order = Number.isFinite(orderNum) ? orderNum : rIdx;
-
-    let layout = get(r, 'layout').toUpperCase();
-    if (mode === 'SLIDE') {
-      layout = VALID_LAYOUTS.has(layout) ? layout : 'BULLETS';
-    } else {
-      layout = '';
-    }
-
-    const body = get(r, 'body');
-    const mediaUrl = normalizeMediaUrl(get(r, 'media_url'));
     const options = [];
     for (let k = 1; k <= 5; k++) {
       const val = get(r, `opt_${k}`);
       if (val) options.push({ key: `opt_${k}`, label: val });
     }
-
     const timerSec = Math.max(0, Number.parseInt(get(r, 'timer_sec'), 10) || 0);
-    const bullets = mode === 'SLIDE' && (layout === 'BULLETS' || layout === 'QUOTE') ? splitBodyBullets(body) : [];
-    const columns = mode === 'SLIDE' && layout === 'SPLIT' ? splitBodyColumns(body) : { left: [], right: [] };
 
-    deck.push({
-      id: `s_${order}_${mode}_${rIdx}`,
-      order,
-      mode,
-      layout,
-      title,
-      subtitle: get(r, 'subtitle'),
-      body,
-      bullets,
-      columns,
-      mediaUrl,
-      options,
-      correctOpt: get(r, 'correct_opt'),
-      explanation: get(r, 'explanation'),
-      timerSec,
-      speakerNote: get(r, 'speaker_note'),
-    });
+    deck.push(
+      buildSlideObject({
+        order,
+        mode,
+        layout: get(r, 'layout'),
+        title,
+        subtitle: get(r, 'subtitle'),
+        body: get(r, 'body'),
+        mediaUrl: get(r, 'media_url'),
+        options,
+        correctOpt: get(r, 'correct_opt'),
+        explanation: get(r, 'explanation'),
+        timerSec,
+        speakerNote: get(r, 'speaker_note'),
+        rIdx,
+      })
+    );
   }
 
   deck.sort((a, b) => a.order - b.order);
@@ -284,17 +435,282 @@ export function rowsToDeck(rows) {
   return { deck, inlineConfig };
 }
 
-async function fetchCsvText(url, label = 'Google Sheets') {
+/**
+ * Split Markdown deck into sections by `---` outside code fences.
+ */
+function splitMarkdownSections(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/);
+  const sections = [];
+  let cur = [];
+  let inFence = false;
+
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith('```')) inFence = !inFence;
+    if (!inFence && t === '---') {
+      sections.push(cur.join('\n'));
+      cur = [];
+    } else {
+      cur.push(line);
+    }
+  }
+  if (cur.length > 0) sections.push(cur.join('\n'));
+  return sections.map((s) => s.trim()).filter(Boolean);
+}
+
+/**
+ * Parse NotebookLM-friendly Markdown slide deck into { config, deck }.
+ */
+export function parseMarkdownDeck(text) {
+  const sections = splitMarkdownSections(text);
+  if (sections.length === 0) {
+    throw new Error('Markdown 簡報內容為空');
+  }
+
+  const configRaw = {};
+  const slideSections = [];
+
+  // Check if first section is global config / YAML frontmatter
+  const first = sections[0];
+  const isConfigOnly =
+    !/^mode\s*:/im.test(first) &&
+    /^(?:event_title|event_subtitle|primary_color|bg_theme|logo_url|join_url_display)\s*:/im.test(first);
+
+  if (isConfigOnly) {
+    for (const line of first.split(/\r?\n/)) {
+      const m = line.trim().match(/^([a-z_]+)\s*:\s*(.+)$/i);
+      if (m) {
+        const k = m[1].toLowerCase();
+        const v = m[2].trim().replace(/^["']|["']$/g, '');
+        if (k in DEFAULT_CONFIG) configRaw[k] = v;
+      }
+    }
+    slideSections.push(...sections.slice(1));
+  } else {
+    slideSections.push(...sections);
+  }
+
+  const deck = [];
+  const metaKeys = new Set([
+    'order', 'mode', 'layout', 'title', 'subtitle', 'body', 'media_url',
+    'opt_1', 'opt_2', 'opt_3', 'opt_4', 'opt_5',
+    'correct_opt', 'explanation', 'timer_sec', 'speaker_note', 'flow',
+  ]);
+
+  slideSections.forEach((sec, idx) => {
+    const meta = {};
+    const bodyLines = [];
+    const lines = sec.split(/\r?\n/);
+    let inFence = false;
+    let diagramCode = '';
+    let fenceLang = '';
+    let fenceBuf = [];
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (trimmed.startsWith('```')) {
+        if (!inFence) {
+          inFence = true;
+          fenceLang = trimmed.slice(3).trim().toLowerCase();
+          fenceBuf = [];
+        } else {
+          inFence = false;
+          if (fenceLang === 'mermaid' || (!fenceLang && !diagramCode)) {
+            diagramCode = fenceBuf.join('\n').trim();
+          } else {
+            bodyLines.push('```' + fenceLang + '\n' + fenceBuf.join('\n') + '\n```');
+          }
+        }
+        continue;
+      }
+      if (inFence) {
+        fenceBuf.push(rawLine);
+        continue;
+      }
+
+      if (/^\[META\]$/i.test(trimmed)) continue;
+
+      // Speaker note blockquote: > speaker_note: ...
+      const noteMatch = trimmed.match(/^>?\s*speaker_note\s*[:：]\s*(.+)$/i);
+      if (noteMatch) {
+        meta.speaker_note = noteMatch[1].trim();
+        continue;
+      }
+
+      // Metadata line (allow optional leading `- ` or `**key**:`)
+      const kv = trimmed.replace(/^[-*]\s*/, '').replace(/\*\*/g, '').match(/^([a-z0-9_]+)\s*[:：]\s*(.*)$/i);
+      if (kv && metaKeys.has(kv[1].toLowerCase())) {
+        const k = kv[1].toLowerCase();
+        meta[k] = kv[2].trim().replace(/^["']|["']$/g, '');
+        continue;
+      }
+
+      // Fallback markdown headings
+      if (!meta.title && /^#\s+(.+)$/.test(trimmed)) {
+        meta.title = trimmed.replace(/^#\s+/, '').trim();
+        continue;
+      }
+      if (!meta.subtitle && /^##\s+(.+)$/.test(trimmed)) {
+        meta.subtitle = trimmed.replace(/^##\s+/, '').trim();
+        continue;
+      }
+
+      if (trimmed) bodyLines.push(trimmed);
+    }
+
+    const mode = (meta.mode || 'SLIDE').toUpperCase();
+    if (!VALID_MODES.has(mode)) return;
+
+    const title = meta.title || `第 ${idx + 1} 頁`;
+    const order = Number.parseInt(meta.order, 10) || idx + 1;
+    let layout = (meta.layout || (diagramCode ? 'DIAGRAM' : 'BULLETS')).toUpperCase();
+    if (mode === 'SLIDE' && diagramCode && !meta.layout) layout = 'DIAGRAM';
+
+    let body = meta.body || '';
+    if (!body && bodyLines.length > 0) {
+      if (mode === 'SLIDE' && layout === 'BULLETS') {
+        body = bodyLines.map((l) => l.replace(/^[-*•]\s*/, '')).join(' | ');
+      } else {
+        body = bodyLines.join('\n');
+      }
+    }
+
+    const options = [];
+    for (let k = 1; k <= 5; k++) {
+      if (meta[`opt_${k}`]) options.push({ key: `opt_${k}`, label: meta[`opt_${k}`] });
+    }
+
+    const flowFlag = /^(true|yes|1)$/i.test(meta.flow || '');
+    const cardsSpec = mode === 'SLIDE' && layout === 'CARDS' ? parseCardsSpec(body, flowFlag) : null;
+
+    deck.push(
+      buildSlideObject({
+        order,
+        mode,
+        layout,
+        title,
+        subtitle: meta.subtitle || '',
+        body,
+        mediaUrl: meta.media_url || '',
+        options,
+        correctOpt: meta.correct_opt || '',
+        explanation: meta.explanation || '',
+        timerSec: Math.max(0, Number.parseInt(meta.timer_sec, 10) || 0),
+        speakerNote: meta.speaker_note || '',
+        diagramCode,
+        cardsSpec,
+        rIdx: idx + 1,
+      })
+    );
+  });
+
+  deck.sort((a, b) => a.order - b.order);
+  if (deck.length === 0) {
+    throw new Error('Markdown 簡報中找不到任何有效頁面（請檢查是否包含 mode: SLIDE / title: ...）');
+  }
+
+  return { config: sanitizeConfig(configRaw), deck };
+}
+
+/**
+ * Parse JSON deck { config, deck } or array of slides.
+ */
+export function parseJsonDeck(text) {
+  const parsed = JSON.parse(String(text || '').replace(/^\uFEFF/, ''));
+  const rawList = Array.isArray(parsed) ? parsed : parsed.deck || parsed.slides || [];
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    throw new Error('JSON 簡報缺少 deck 陣列');
+  }
+  const cfg = sanitizeConfig(Array.isArray(parsed) ? {} : parsed.config || {});
+  const deck = rawList
+    .map((item, i) => {
+      const options = Array.isArray(item.options)
+        ? item.options.map((o, oi) => (typeof o === 'string' ? { key: `opt_${oi + 1}`, label: o } : o))
+        : [1, 2, 3, 4, 5]
+            .filter((k) => item[`opt_${k}`])
+            .map((k) => ({ key: `opt_${k}`, label: item[`opt_${k}`] }));
+
+      return buildSlideObject({
+        order: Number.parseInt(item.order, 10) || i + 1,
+        mode: item.mode || 'SLIDE',
+        layout: item.layout || '',
+        title: item.title || `第 ${i + 1} 頁`,
+        subtitle: item.subtitle || '',
+        body: item.body || '',
+        mediaUrl: item.media_url || item.mediaUrl || '',
+        options,
+        correctOpt: item.correct_opt || item.correctOpt || '',
+        explanation: item.explanation || '',
+        timerSec: Math.max(0, Number.parseInt(item.timer_sec || item.timerSec, 10) || 0),
+        speakerNote: item.speaker_note || item.speakerNote || '',
+        diagramCode: item.diagramCode || item.mermaid || '',
+        rIdx: i + 1,
+      });
+    })
+    .filter((s) => VALID_MODES.has(s.mode));
+
+  deck.sort((a, b) => a.order - b.order);
+  return { config: cfg, deck };
+}
+
+/**
+ * Auto-detect JSON, Markdown, or CSV deck text.
+ */
+export function parseAnyDeckText(rawText, configCsvText = '') {
+  const clean = String(rawText || '').replace(/^\uFEFF/, '').trim();
+  if (!clean) throw new Error('匯入內容為空');
+
+  // Strip outer markdown ```markdown / ```csv / ```json wrapper if copied from AI chat
+  let text = clean;
+  const wrapped = clean.match(/^```(?:markdown|md|csv|json)?\s*\n([\s\S]*?)\n```$/i);
+  if (wrapped) text = wrapped[1].trim();
+
+  if (text.startsWith('{') || text.startsWith('[')) {
+    const res = parseJsonDeck(text);
+    const extraCfg = configCsvText ? rowsToConfig(parseCSV(configCsvText)) : {};
+    return {
+      config: sanitizeConfig({ ...res.config, ...extraCfg }),
+      deck: res.deck,
+      format: 'JSON',
+    };
+  }
+
+  const looksLikeMarkdown =
+    text.startsWith('---') ||
+    /(?:^|\n)\s*mode\s*[:：]/i.test(text) ||
+    /(?:^|\n)\s*```mermaid/i.test(text) ||
+    /(?:^|\n)\s*#\s+/.test(text);
+
+  if (looksLikeMarkdown && !/^\s*order\s*,\s*mode/i.test(text)) {
+    const res = parseMarkdownDeck(text);
+    const extraCfg = configCsvText ? rowsToConfig(parseCSV(configCsvText)) : {};
+    return {
+      config: sanitizeConfig({ ...res.config, ...extraCfg }),
+      deck: res.deck,
+      format: 'Markdown',
+    };
+  }
+
+  const { deck, inlineConfig } = rowsToDeck(parseCSV(text));
+  const baseCfg = configCsvText ? rowsToConfig(parseCSV(configCsvText)) : {};
+  return {
+    config: sanitizeConfig({ ...baseCfg, ...inlineConfig }),
+    deck,
+    format: 'CSV',
+  };
+}
+
+async function fetchTextResource(url, label = '雲端檔案') {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 10000);
+  const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    const res = await fetch(url, { signal: controller.signal, redirect: 'follow' });
     if (!res.ok) {
       throw new Error(`${label} 回應錯誤 HTTP ${res.status}`);
     }
     const text = await res.text();
     if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
-      throw new Error(`${label} 取得 HTML 而非 CSV，請確認已「發布到網路」並選 CSV 格式`);
+      throw new Error(`${label} 取得 HTML 而非純文字/CSV，請確認雲端檔案已開啟「知道連結者可檢視」或「發布到網路」`);
     }
     return text;
   } finally {
@@ -303,7 +719,7 @@ async function fetchCsvText(url, label = 'Google Sheets') {
 }
 
 /**
- * Load both Config and Deck from Google Sheets URLs or local sample CSVs.
+ * Load both Config and Deck from Google Sheets / Google Docs / Google Drive / URL or local sample.
  */
 export async function loadDeckPackage({ deckUrl = '', configUrl = '' } = {}) {
   const rawDeck = String(deckUrl || '').trim();
@@ -311,38 +727,29 @@ export async function loadDeckPackage({ deckUrl = '', configUrl = '' } = {}) {
   const normalizedDeck = normalizeSheetCsvUrl(rawDeck);
 
   if (normalizedDeck) {
-    const deckText = await fetchCsvText(normalizedDeck, 'Deck 工作表');
-    const { deck, inlineConfig } = rowsToDeck(parseCSV(deckText));
-
-    let configObj = {};
+    const deckText = await fetchTextResource(normalizedDeck, '講題來源');
+    let configCsvText = '';
     let resolvedConfigSource = '';
     const explicitConfigUrl = normalizeSheetCsvUrl(rawConfig);
 
     if (explicitConfigUrl) {
-      const cfgText = await fetchCsvText(explicitConfigUrl, 'Config 工作表');
-      configObj = rowsToConfig(parseCSV(cfgText));
+      configCsvText = await fetchTextResource(explicitConfigUrl, 'Config 工作表');
       resolvedConfigSource = explicitConfigUrl;
     } else if (/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/.test(rawDeck) && !rawDeck.includes('/d/e/')) {
-      // Auto-try reading the "Config" tab on standard Google Sheets links
       const autoCfgUrl = normalizeSheetCsvUrl(rawDeck, 'Config');
       try {
-        const cfgText = await fetchCsvText(autoCfgUrl, 'Config 工作表');
-        configObj = rowsToConfig(parseCSV(cfgText));
+        configCsvText = await fetchTextResource(autoCfgUrl, 'Config 工作表');
         resolvedConfigSource = autoCfgUrl;
       } catch {
-        configObj = sanitizeConfig(inlineConfig);
+        // Optional Config tab
       }
-    } else {
-      configObj = sanitizeConfig(inlineConfig);
     }
 
-    // Inline CONFIG rows override defaults if explicit config didn't specify them
-    const finalConfig = sanitizeConfig({ ...configObj, ...inlineConfig });
-
+    const parsed = parseAnyDeckText(deckText, configCsvText);
     return {
-      config: finalConfig,
-      deck,
-      source: normalizedDeck,
+      config: parsed.config,
+      deck: parsed.deck,
+      source: `${normalizedDeck} (${parsed.format})`,
       configSource: resolvedConfigSource,
       deckUrl: rawDeck,
       configUrl: rawConfig,
@@ -371,16 +778,14 @@ export async function loadDeckPackage({ deckUrl = '', configUrl = '' } = {}) {
 }
 
 /**
- * Parse raw CSV strings uploaded directly from /admin or presets.
+ * Parse raw CSV / Markdown / JSON strings uploaded directly from /admin.
  */
-export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '本機匯入 CSV' }) {
-  const { deck, inlineConfig } = rowsToDeck(parseCSV(deckCsv));
-  const baseCfg = configCsv ? rowsToConfig(parseCSV(configCsv)) : {};
-  const config = sanitizeConfig({ ...baseCfg, ...inlineConfig });
+export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '本機匯入檔案' }) {
+  const parsed = parseAnyDeckText(deckCsv, configCsv);
   return {
-    config,
-    deck,
-    source: sourceLabel,
+    config: parsed.config,
+    deck: parsed.deck,
+    source: `${sourceLabel} (${parsed.format})`,
     configSource: configCsv ? '本機匯入 Config' : '',
     deckUrl: '',
     configUrl: '',
@@ -390,16 +795,21 @@ export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '�
 
 const PRESET_LABELS = {
   default: '用 AI 改善工作流──邁向優雅的教師生活（18頁研習版）',
-  'parent-orientation': '115 學年度新生入學說明會（範例範本）',
+  'notebooklm-showcase': 'NotebookLM × 快速生圖展示範本（Markdown + Mermaid + 圖表 + 圖卡）',
+  'parent-orientation': '115 學年度新生入學說明會（淺色主題範例）',
 };
 
 export function listPresets() {
   const presets = [{ id: 'default', label: PRESET_LABELS.default }];
   const decksDir = path.join(DATA_DIR, 'decks');
   if (fs.existsSync(decksDir)) {
+    const seen = new Set();
     for (const f of fs.readdirSync(decksDir)) {
-      if (!f.endsWith('.csv') || f.endsWith('.config.csv')) continue;
-      const id = f.slice(0, -4);
+      if (f.endsWith('.config.csv')) continue;
+      if (!f.endsWith('.csv') && !f.endsWith('.md') && !f.endsWith('.json')) continue;
+      const id = f.replace(/\.(csv|md|json)$/, '');
+      if (seen.has(id)) continue;
+      seen.add(id);
       presets.push({ id, label: PRESET_LABELS[id] || id });
     }
   }
@@ -413,15 +823,23 @@ export async function loadPreset(presetId = 'default') {
     return { ...pkg, isFallback: false };
   }
   const decksDir = path.join(DATA_DIR, 'decks');
-  const deckPath = path.join(decksDir, `${cleanId}.csv`);
-  if (!fs.existsSync(deckPath)) {
+  const candidateExts = ['.md', '.json', '.csv'];
+  let deckPath = '';
+  for (const ext of candidateExts) {
+    const p = path.join(decksDir, `${cleanId}${ext}`);
+    if (fs.existsSync(p)) {
+      deckPath = p;
+      break;
+    }
+  }
+  if (!deckPath) {
     throw new Error(`找不到內建範本：${cleanId}`);
   }
   const cfgPath = path.join(decksDir, `${cleanId}.config.csv`);
-  const deckCsv = fs.readFileSync(deckPath, 'utf8');
+  const deckText = fs.readFileSync(deckPath, 'utf8');
   const configCsv = fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, 'utf8') : '';
   return loadDeckFromCsvTexts({
-    deckCsv,
+    deckCsv: deckText,
     configCsv,
     sourceLabel: `preset:${cleanId} (${PRESET_LABELS[cleanId] || cleanId})`,
   });

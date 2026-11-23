@@ -198,6 +198,37 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
 .media-frame img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
 .media-caption{margin-top:12px;text-align:center;font-size:16px;color:var(--muted);font-weight:600}
 
+/* Layout: DIAGRAM / CHART / CARDS */
+.diagram-frame,.chart-frame{
+  flex:1;min-height:360px;max-height:calc(100vh - 250px);
+  display:flex;align-items:center;justify-content:center;
+  background:var(--surface);border:1.5px solid var(--border);border-radius:24px;
+  padding:24px;box-shadow:var(--shadow);overflow:hidden;width:100%;
+}
+.diagram-frame svg{max-width:100%;max-height:calc(100vh - 300px);width:auto;height:auto}
+.chart-frame svg{width:100%;height:100%;max-height:calc(100vh - 300px)}
+.cards-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:22px;margin-top:16px;align-items:stretch;
+}
+.info-card{
+  position:relative;background:var(--surface);border:1.5px solid var(--border);
+  border-radius:22px;padding:26px 24px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:10px;border-top:5px solid var(--primary);
+}
+.info-tag{
+  display:inline-block;align-self:flex-start;padding:4px 12px;border-radius:999px;
+  background:var(--primary-soft);color:var(--primary);font-size:13px;font-weight:800;
+}
+.info-title{font-size:clamp(20px,1.9vw,28px);font-weight:900;line-height:1.3;margin:0}
+.info-desc{font-size:clamp(15px,1.35vw,20px);color:var(--muted);line-height:1.55;margin:0}
+.flow-arrow{
+  position:absolute;right:-18px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;z-index:2;
+}
+@media(max-width:860px){.flow-arrow{display:none}}
+
 /* Spotlight Danmaku */
 .spotlight{
   position:fixed;left:50%;top:55%;transform:translate(-50%,-50%) scale(.92);
@@ -541,7 +572,7 @@ function renderSlideDOM(s) {
   const interHeader = document.getElementById('interactiveHeader');
 
   if (!s) return;
-  const key = `${s.slideId}|${s.mode}|${s.layout}|${s.subStep}|${s.title}|${s.body}|${s.mediaUrl}`;
+  const key = `${s.slideId}|${s.mode}|${s.layout}|${s.subStep}|${s.title}|${s.body}|${s.mediaUrl}|${s.diagramCode || ''}`;
   const isSlide = s.mode === 'SLIDE';
 
   // Floating QR visibility: hide automatically on COVER (which has large QR card) unless user explicitly toggled on non-cover
@@ -667,7 +698,206 @@ function renderSlideDOM(s) {
         </div>
         ${s.body ? `<div class="media-caption">${esc(s.body)}</div>` : ''}
       </div>`;
+  } else if (layout === 'DIAGRAM') {
+    innerEl.innerHTML = `
+      <div class="layout-media">
+        <h1 class="slide-h" style="font-size:clamp(24px,2.5vw,38px)">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub" style="margin-bottom:16px">${esc(s.subtitle)}</p>` : ''}
+        <div id="mermaidBox" class="diagram-frame"><span style="color:var(--muted)">正在繪製向量圖表...</span></div>
+      </div>`;
+    renderMermaidDiagram(s.diagramCode || s.body || '');
+  } else if (layout === 'CHART') {
+    innerEl.innerHTML = `
+      <div class="layout-media">
+        <h1 class="slide-h" style="font-size:clamp(24px,2.5vw,38px)">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub" style="margin-bottom:16px">${esc(s.subtitle)}</p>` : ''}
+        <div class="chart-frame">${renderChartSVG(s.chartSpec, s.config)}</div>
+      </div>`;
+  } else if (layout === 'CARDS') {
+    const spec = s.cardsSpec || { flow: false, cards: [] };
+    const cards = spec.cards || [];
+    innerEl.innerHTML = `
+      <div>
+        <h1 class="slide-h">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub">${esc(s.subtitle)}</p>` : ''}
+        <div class="cards-grid">
+          ${cards.map((c, i) => `
+            <div class="info-card" style="border-top-color:${COLORS[i % COLORS.length]}">
+              <span class="info-tag">${esc(c.tag || `0${i + 1}`)}</span>
+              <h2 class="info-title">${esc(c.title)}</h2>
+              ${c.desc ? `<p class="info-desc">${esc(c.desc)}</p>` : ''}
+              ${spec.flow && i < cards.length - 1 ? '<span class="flow-arrow">➔</span>' : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>`;
   }
+}
+
+let mermaidPromise = null;
+async function renderMermaidDiagram(code) {
+  const box = document.getElementById('mermaidBox');
+  if (!box) return;
+  if (!code.trim()) {
+    box.innerHTML = '<span style="color:var(--muted)">尚未填寫 Mermaid 圖表語法</span>';
+    return;
+  }
+  try {
+    if (!mermaidPromise) {
+      mermaidPromise = import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs').then(m => m.default);
+    }
+    const mermaid = await mermaidPromise;
+    const light = isLightTheme();
+    const primary = state?.config?.primary_color || '#6366f1';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: light ? 'default' : 'dark',
+      themeVariables: {
+        primaryColor: primary,
+        primaryBorderColor: primary,
+        lineColor: light ? '#475569' : '#94a3b8',
+        fontFamily: '"Noto Sans TC","Microsoft JhengHei",sans-serif',
+        fontSize: '18px',
+      },
+    });
+    const uid = 'mmd_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    const { svg } = await mermaid.render(uid, code);
+    if (document.getElementById('mermaidBox')) {
+      document.getElementById('mermaidBox').innerHTML = svg;
+    }
+  } catch {
+    box.innerHTML = renderFallbackDiagramSVG(code);
+  }
+}
+
+function renderFallbackDiagramSVG(code) {
+  const lines = String(code || '').split(/\r?\n/).map(l => l.trim()).filter(l => l.includes('-->'));
+  const nodes = [];
+  const seen = new Set();
+  for (const l of lines) {
+    for (const part of l.split('-->')) {
+      const label = part.replace(/^[^\[]*[\[\(\{"]+|[\]\)\}"]+$/g, '').replace(/"/g, '').trim();
+      if (label && !seen.has(label)) { seen.add(label); nodes.push(label); }
+    }
+  }
+  if (!nodes.length) return `<pre style="text-align:left;color:var(--text);font-size:15px;white-space:pre-wrap">${esc(code)}</pre>`;
+  const w = Math.max(900, nodes.length * 220), h = 240;
+  const step = w / nodes.length;
+  const light = isLightTheme();
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+    ${nodes.map((n, i) => {
+      const x = i * step + 20, bw = step - 54;
+      return `<rect x="${x}" y="70" width="${bw}" height="96" rx="16" fill="${light ? '#ffffff' : '#1e293b'}" stroke="${COLORS[i % COLORS.length]}" stroke-width="2.5"/>
+        <text x="${x + bw / 2}" y="124" text-anchor="middle" fill="${light ? '#0f172a' : '#f8fafc'}" font-size="16" font-weight="700">${esc(n.slice(0, 18))}</text>
+        ${i < nodes.length - 1 ? `<path d="M${x + bw + 6} 118 H${x + step - 12}" stroke="#6366f1" stroke-width="4"/><polygon points="${x + step - 14},110 ${x + step - 2},118 ${x + step - 14},126" fill="#6366f1"/>` : ''}`;
+    }).join('')}
+  </svg>`;
+}
+
+function renderChartSVG(spec, cfg) {
+  const items = spec?.items || [];
+  if (!items.length) return '<span style="color:var(--muted)">尚未填寫圖表數據（格式：項目: 數值）</span>';
+  const type = spec.chartType || 'bar';
+  const unit = spec.unit || '';
+  const light = isLightTheme();
+  const txtColor = light ? '#0f172a' : '#f8fafc';
+  const mutedColor = light ? '#475569' : '#94a3b8';
+  const gridColor = light ? 'rgba(15,23,42,0.1)' : 'rgba(148,163,184,0.16)';
+
+  if (type === 'pie' || type === 'donut') {
+    const total = Math.max(0.0001, items.reduce((a, b) => a + Math.max(0, b.value), 0));
+    let acc = -Math.PI / 2;
+    const cx = 310, cy = 230, r = 165, ir = 90;
+    const slices = items.map((it, i) => {
+      const ang = (Math.max(0, it.value) / total) * Math.PI * 2;
+      const x1 = cx + Math.cos(acc) * r, y1 = cy + Math.sin(acc) * r;
+      const x2 = cx + Math.cos(acc + ang) * r, y2 = cy + Math.sin(acc + ang) * r;
+      const ix1 = cx + Math.cos(acc + ang) * ir, iy1 = cy + Math.sin(acc + ang) * ir;
+      const ix2 = cx + Math.cos(acc) * ir, iy2 = cy + Math.sin(acc) * ir;
+      const large = ang > Math.PI ? 1 : 0;
+      const d = `M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} L${ix1},${iy1} A${ir},${ir} 0 ${large},0 ${ix2},${iy2} Z`;
+      acc += ang;
+      return `<path d="${d}" fill="${COLORS[i % COLORS.length]}" stroke="${light ? '#fff' : '#0f172a'}" stroke-width="3"/>`;
+    }).join('');
+    const legend = items.map((it, i) => {
+      const pct = Math.round((Math.max(0, it.value) / total) * 100);
+      const y = 95 + i * 52;
+      return `<rect x="560" y="${y - 16}" width="20" height="20" rx="6" fill="${COLORS[i % COLORS.length]}"/>
+        <text x="594" y="${y}" fill="${txtColor}" font-size="22" font-weight="700">${esc(it.label)}</text>
+        <text x="594" y="${y + 24}" fill="${mutedColor}" font-size="17" font-weight="700">${it.value}${esc(unit)} (${pct}%)</text>`;
+    }).join('');
+    return `<svg viewBox="0 0 1000 460">${slices}<text x="${cx}" y="${cy + 8}" text-anchor="middle" fill="${txtColor}" font-size="28" font-weight="900">${Math.round(total * 10) / 10}${esc(unit)}</text>${legend}</svg>`;
+  }
+
+  if (type === 'radar') {
+    const cx = 500, cy = 240, R = 170, n = items.length;
+    const maxV = Math.max(100, ...items.map(i => i.value));
+    const webs = [0.25, 0.5, 0.75, 1].map(f => {
+      const pts = items.map((_, i) => {
+        const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+        return `${cx + Math.cos(a) * R * f},${cy + Math.sin(a) * R * f}`;
+      }).join(' ');
+      return `<polygon points="${pts}" fill="none" stroke="${gridColor}" stroke-width="1.5"/>`;
+    }).join('');
+    const axes = items.map((it, i) => {
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      const x = cx + Math.cos(a) * R, y = cy + Math.sin(a) * R;
+      const lx = cx + Math.cos(a) * (R + 36), ly = cy + Math.sin(a) * (R + 28);
+      return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${gridColor}" stroke-width="1.5"/>
+        <text x="${lx}" y="${ly + 6}" text-anchor="middle" fill="${txtColor}" font-size="20" font-weight="800">${esc(it.label)} (${it.value}${esc(unit)})</text>`;
+    }).join('');
+    const polyPts = items.map((it, i) => {
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      const r = (Math.max(0, it.value) / maxV) * R;
+      return `${cx + Math.cos(a) * r},${cy + Math.sin(a) * r}`;
+    }).join(' ');
+    const primary = cfg?.primary_color || '#38bdf8';
+    return `<svg viewBox="0 0 1000 480">${webs}${axes}<polygon points="${polyPts}" fill="${primary}44" stroke="${primary}" stroke-width="4"/>${items.map((it, i) => {
+      const a = -Math.PI / 2 + (i / n) * Math.PI * 2;
+      const r = (Math.max(0, it.value) / maxV) * R;
+      return `<circle cx="${cx + Math.cos(a) * r}" cy="${cy + Math.sin(a) * r}" r="7" fill="${primary}"/>`;
+    }).join('')}</svg>`;
+  }
+
+  if (type === 'line') {
+    const maxV = Math.max(1, ...items.map(i => i.value)) * 1.15;
+    const left = 90, right = 940, top = 50, bottom = 380, w = right - left, h = bottom - top;
+    const pts = items.map((it, i) => {
+      const x = left + (items.length === 1 ? w / 2 : (i / (items.length - 1)) * w);
+      const y = bottom - (Math.max(0, it.value) / maxV) * h;
+      return { x, y, ...it };
+    });
+    const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
+    const areaD = `${pathD} L${pts[pts.length - 1].x},${bottom} L${pts[0].x},${bottom} Z`;
+    const primary = cfg?.primary_color || '#38bdf8';
+    return `<svg viewBox="0 0 1000 450">
+      <line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="${gridColor}" stroke-width="2"/>
+      <path d="${areaD}" fill="${primary}28"/>
+      <path d="${pathD}" fill="none" stroke="${primary}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="8" fill="${primary}" stroke="#fff" stroke-width="2.5"/>
+        <text x="${p.x}" y="${p.y - 16}" text-anchor="middle" fill="${txtColor}" font-size="20" font-weight="800">${p.value}${esc(unit)}</text>
+        <text x="${p.x}" y="${bottom + 34}" text-anchor="middle" fill="${mutedColor}" font-size="18" font-weight="700">${esc(p.label)}</text>`).join('')}
+    </svg>`;
+  }
+
+  // Default: bar chart
+  const maxV = Math.max(1, ...items.map(i => i.value)) * 1.18;
+  const left = 70, right = 950, top = 45, bottom = 370, w = right - left, h = bottom - top;
+  const slot = w / items.length;
+  const barW = Math.min(130, slot * 0.56);
+  return `<svg viewBox="0 0 1000 450">
+    ${[0.25, 0.5, 0.75, 1].map(f => `<line x1="${left}" y1="${bottom - h * f}" x2="${right}" y2="${bottom - h * f}" stroke="${gridColor}" stroke-width="1.5"/>`).join('')}
+    <line x1="${left}" y1="${bottom}" x2="${right}" y2="${bottom}" stroke="${mutedColor}" stroke-width="2"/>
+    ${items.map((it, i) => {
+      const bh = (Math.max(0, it.value) / maxV) * h;
+      const x = left + i * slot + (slot - barW) / 2;
+      const y = bottom - bh;
+      const col = COLORS[i % COLORS.length];
+      return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" rx="12" fill="${col}"/>
+        <text x="${x + barW / 2}" y="${y - 14}" text-anchor="middle" fill="${txtColor}" font-size="24" font-weight="900">${it.value}${esc(unit)}</text>
+        <text x="${x + barW / 2}" y="${bottom + 34}" text-anchor="middle" fill="${mutedColor}" font-size="19" font-weight="700">${esc(it.label)}</text>`;
+    }).join('')}
+  </svg>`;
 }
 
 function isLightTheme() {

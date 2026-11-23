@@ -40,8 +40,16 @@ async function runTests() {
     normalizeSheetCsvUrl('https://docs.google.com/spreadsheets/d/1XYZ/edit#gid=42'),
     'https://docs.google.com/spreadsheets/d/1XYZ/export?format=csv&gid=42'
   );
+  assert.equal(
+    normalizeSheetCsvUrl('https://docs.google.com/document/d/1DocAbc/edit?usp=sharing'),
+    'https://docs.google.com/document/d/1DocAbc/export?format=txt'
+  );
+  assert.equal(
+    normalizeSheetCsvUrl('https://drive.google.com/file/d/1DriveFile/view?usp=sharing'),
+    'https://drive.google.com/uc?export=download&id=1DriveFile'
+  );
 
-  console.log('2. Testing 18-slide workshop package, presets & CSV text import...');
+  console.log('2. Testing 18-slide workshop package, Markdown/JSON presets & fast-graphic parsers...');
   const pkg = await loadDeckPackage({});
   assert.equal(pkg.deck.length, 18, 'Default workshop deck should have 18 slides');
   assert.equal(pkg.config.primary_color, '#6366f1');
@@ -49,6 +57,28 @@ async function runTests() {
 
   const presets = listPresets();
   assert.ok(presets.some((p) => p.id === 'parent-orientation'));
+  assert.ok(presets.some((p) => p.id === 'notebooklm-showcase'));
+  const nlmPkg = await loadPreset('notebooklm-showcase');
+  assert.equal(nlmPkg.config.bg_theme, 'TECH_GRID');
+  assert.equal(nlmPkg.deck.length, 6);
+  assert.equal(nlmPkg.deck[1].layout, 'CARDS');
+  assert.equal(nlmPkg.deck[1].cardsSpec.flow, true);
+  assert.equal(nlmPkg.deck[1].cardsSpec.cards.length, 3);
+  assert.equal(nlmPkg.deck[2].layout, 'DIAGRAM');
+  assert.ok(nlmPkg.deck[2].diagramCode.includes('flowchart LR'));
+  assert.equal(nlmPkg.deck[3].layout, 'CHART');
+  assert.equal(nlmPkg.deck[3].chartSpec.chartType, 'bar');
+  assert.equal(nlmPkg.deck[3].chartSpec.items.length, 3);
+  assert.equal(nlmPkg.deck[5].chartSpec.chartType, 'radar');
+
+  const jsonPkg = loadDeckFromCsvTexts({
+    deckCsv: JSON.stringify({
+      config: { event_title: 'JSON Deck', primary_color: '#10b981' },
+      deck: [{ order: 1, mode: 'SLIDE', layout: 'CARDS', title: 'Steps', body: 'S1|A|B::S2|C|D' }],
+    }),
+  });
+  assert.equal(jsonPkg.config.event_title, 'JSON Deck');
+  assert.equal(jsonPkg.deck[0].cardsSpec.cards.length, 2);
   const parentPkg = await loadPreset('parent-orientation');
   assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
   assert.equal(parentPkg.deck.length, 5);

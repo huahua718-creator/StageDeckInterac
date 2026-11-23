@@ -93,25 +93,41 @@ a{color:var(--sky)}
     <div class="card">
       <h3>📊 講題腳本來源與熱重載 (Zero-Code CMS)</h3>
       <p class="muted" style="margin:0 0 10px">
-        支援三種匯入方式：① Google 試算表發布 <code>.csv</code> 連結（推薦，支援現場 <code>[R]</code> 熱重載） ② 一鍵切換內建主題範本 ③ 直接上傳本機 <code>.csv</code> 檔。
+        支援貼上 <b>Google Sheets（發布 CSV）</b>、<b>Google Docs 公開連結</b> 或 <b>Google Drive 檔案（.md / .csv / .json）</b>，亦支援內建快速生圖（<code>DIAGRAM</code> / <code>CHART</code> / <code>CARDS</code>）。
         下載範本：<a href="/api/sample-deck.csv" download>Deck 範本 (.csv)</a> ｜ <a href="/api/sample-config.csv" download>Config 範本 (.csv)</a>
       </p>
       <div class="row" style="margin-bottom:10px">
-        <input id="deckInput" type="text" placeholder="貼上 Google Sheets Deck CSV 連結（或整份試算表分享連結）">
-        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:300px">
+        <input id="deckInput" type="text" placeholder="貼上 Google Sheets / Google Docs / Google Drive (.md/.csv/.json) 公開連結">
+        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:260px">
         <button id="syncBtn" class="primary">🔄 熱重載更新</button>
       </div>
       <div class="row" style="margin-bottom:10px;padding-top:10px;border-top:1px dashed var(--border)">
         <select id="presetSelect" style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:14px"></select>
         <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
         <label class="muted" style="display:flex;align-items:center;gap:6px">
-          本機 Deck CSV：<input id="csvFileInput" type="file" accept=".csv,text/csv" style="max-width:220px;font-size:12px">
+          本機檔案(.md/.csv/.json)：<input id="csvFileInput" type="file" accept=".csv,.md,.markdown,.txt,.json" style="max-width:200px;font-size:12px">
         </label>
-        <button id="uploadCsvBtn" class="ghost">📤 匯入 CSV 檔</button>
+        <button id="uploadCsvBtn" class="ghost">📤 匯入檔案</button>
+        <button id="promptBtn" class="sky">✨ 複製 NotebookLM 提示詞</button>
       </div>
       <div class="row" style="justify-content:space-between">
         <span id="syncMsg" class="muted"></span>
         <span id="shareUrlPreview" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="promptModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:60;align-items:center;justify-content:center;padding:20px">
+      <div class="card" style="max-width:760px;width:100%;max-height:86vh;overflow-y:auto;border-color:var(--sky)">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <h3 style="margin:0">✨ NotebookLM 專用簡報＋自動生圖 Prompt</h3>
+          <button onclick="document.getElementById('promptModal').style.display='none'" class="ghost">關閉</button>
+        </div>
+        <p class="muted" style="margin:0 0 10px">複製貼進 NotebookLM 後，將產出匯出至 Google Docs（開啟「知道連結者可檢視」）或存成 <code>.md</code> 丟進 Google Drive，再貼上連結即可自動生成投影片＋向量圖表！</p>
+        <textarea id="nlmPromptText" rows="15" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:13px;line-height:1.55" readonly></textarea>
+        <div class="row" style="margin-top:12px">
+          <button id="copyNlmPromptBtn" class="primary">📋 一鍵複製 Prompt</button>
+          <span id="nlmCopyTip" class="muted"></span>
+        </div>
       </div>
     </div>
 
@@ -303,10 +319,10 @@ $('presetBtn').onclick = async () => {
 $('uploadCsvBtn').onclick = async () => {
   const file = $('csvFileInput').files?.[0];
   if (!file) {
-    $('syncMsg').textContent = '請先選擇一個 .csv 檔案';
+    $('syncMsg').textContent = '請先選擇一個 .md / .csv / .json 檔案';
     return;
   }
-  $('syncMsg').textContent = '匯入 CSV 中...';
+  $('syncMsg').textContent = '匯入檔案中...';
   try {
     const deckCsv = await file.text();
     const res = await api('/api/admin/upload-csv', 'POST', { deckCsv, sourceLabel: `本機檔案 (${file.name})` });
@@ -316,6 +332,46 @@ $('uploadCsvBtn').onclick = async () => {
   } catch (e) {
     $('syncMsg').textContent = `✕ 匯入失敗：${e.message}`;
   }
+};
+
+const NLM_PROMPT = `請根據我上傳的講綱與資料，為我生成一份「互動式講座簡報腳本」，輸出格式請嚴格使用以下 Markdown 分頁語法（不要輸出多餘開場白，方便我直接匯出至 Google 文件或存成 .md 放入 Google Drive）：
+
+---
+event_title: 講座主標題
+event_subtitle: 副標題或研習單位
+primary_color: "#6366f1"
+bg_theme: DARK_NEBULA
+---
+
+每一頁用 --- 分隔，格式如下：
+1. 講述頁（mode: SLIDE）依內容性質選用最合適的 layout：
+   - layout: COVER（第 1 頁封面，可加 body 掃碼引導）
+   - layout: QUOTE（金句名言，body 用 | 分隔原文與中文翻譯）
+   - layout: BULLETS（3~4 點重點，每點一行 - ）
+   - layout: SPLIT（左右對比，body 用 :: 分隔左右欄）
+   - layout: DIAGRAM（遇到流程、架構、步驟、心智圖時務必用此版型，附上 \`\`\`mermaid 語法，節點文字請用雙引號包住）
+   - layout: CHART（遇到數據、時間比較、佔比時務必用此版型，寫 type: bar|pie|line|radar、unit: 單位，以及 項目: 數值）
+   - layout: CARDS（適合 3~4 階段進化史或步驟卡片，寫 flow: true 與每張卡一行 - 標籤 | 標題 | 說明）
+
+2. 互動頁（穿插 5~6 頁，緊扣聽眾痛點）：
+   - mode: QUADRANT（二維座標，opt_1 為 X 軸、opt_2 為 Y 軸）
+   - mode: BUBBLE（單選氣泡，opt_1 ~ opt_4）
+   - mode: MYTH（限時迷思搶答，opt_1 ~ opt_4、correct_opt、explanation、timer_sec: 15）
+   - mode: SPECTRUM（雙向天平，opt_1 與 opt_2）
+   - mode: TREE（結尾願景共育）
+   - mode: DANMAKU（Q&A 彈幕，opt_1 ~ opt_3 為分類標籤）
+
+3. 每頁最後都要附上一行：
+> speaker_note: 給講者的 40 字內口語提詞`;
+
+$('nlmPromptText').value = NLM_PROMPT;
+$('promptBtn').onclick = () => {
+  $('nlmCopyTip').textContent = '';
+  $('promptModal').style.display = 'flex';
+};
+$('copyNlmPromptBtn').onclick = async () => {
+  await navigator.clipboard?.writeText(NLM_PROMPT);
+  $('nlmCopyTip').textContent = '✓ 已複製！直接貼進 NotebookLM 即可';
 };
 
 function render() {
