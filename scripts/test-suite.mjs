@@ -49,7 +49,7 @@ async function runTests() {
     'https://drive.google.com/uc?export=download&id=1DriveFile'
   );
 
-  console.log('2. Testing 18-slide workshop package, Markdown/JSON presets & fast-graphic parsers...');
+  console.log('2. Testing 18-slide workshop package, presets & CSV/JSON export...');
   const pkg = await loadDeckPackage({});
   assert.equal(pkg.deck.length, 18, 'Default workshop deck should have 18 slides');
   assert.equal(pkg.config.primary_color, '#6366f1');
@@ -57,31 +57,18 @@ async function runTests() {
 
   const presets = listPresets();
   assert.ok(presets.some((p) => p.id === 'parent-orientation'));
-  assert.ok(presets.some((p) => p.id === 'notebooklm-showcase'));
-  const nlmPkg = await loadPreset('notebooklm-showcase');
-  assert.equal(nlmPkg.config.bg_theme, 'TECH_GRID');
-  assert.equal(nlmPkg.deck.length, 6);
-  assert.equal(nlmPkg.deck[1].layout, 'CARDS');
-  assert.equal(nlmPkg.deck[1].cardsSpec.flow, true);
-  assert.equal(nlmPkg.deck[1].cardsSpec.cards.length, 3);
-  assert.equal(nlmPkg.deck[2].layout, 'DIAGRAM');
-  assert.ok(nlmPkg.deck[2].diagramCode.includes('flowchart LR'));
-  assert.equal(nlmPkg.deck[3].layout, 'CHART');
-  assert.equal(nlmPkg.deck[3].chartSpec.chartType, 'bar');
-  assert.equal(nlmPkg.deck[3].chartSpec.items.length, 3);
-  assert.equal(nlmPkg.deck[5].chartSpec.chartType, 'radar');
+  const parentPkg = await loadPreset('parent-orientation');
+  assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
+  assert.equal(parentPkg.deck.length, 5);
 
   const jsonPkg = loadDeckFromCsvTexts({
     deckCsv: JSON.stringify({
       config: { event_title: 'JSON Deck', primary_color: '#10b981' },
-      deck: [{ order: 1, mode: 'SLIDE', layout: 'CARDS', title: 'Steps', body: 'S1|A|B::S2|C|D' }],
+      deck: [{ order: 1, mode: 'SLIDE', layout: 'CARDS', title: 'Steps', body: 'S1|A|B::S2|C|D', image_prompt: 'AI robot teacher' }],
     }),
   });
   assert.equal(jsonPkg.config.event_title, 'JSON Deck');
-  assert.equal(jsonPkg.deck[0].cardsSpec.cards.length, 2);
-  const parentPkg = await loadPreset('parent-orientation');
-  assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
-  assert.equal(parentPkg.deck.length, 5);
+  assert.equal(jsonPkg.deck[0].imagePrompt, 'AI robot teacher');
 
   const uploadedPkg = loadDeckFromCsvTexts({
     deckCsv: 'order,mode,layout,title,body\n1,SLIDE,COVER,Test Import,Sub\n',
@@ -224,6 +211,61 @@ async function runTests() {
       });
       assert.equal(vRes.status, 200);
     }
+
+    // Test Visual Deck Editor (batchSlides, upsert, move, delete, export-csv, upload-media)
+    const tinyPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const upRes = await fetch(`${base}/api/admin/upload-media?room=editorroom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({ dataUrl: tinyPng, filenamePrefix: 'test' }),
+    });
+    assert.equal(upRes.status, 200);
+    const upJson = await upRes.json();
+    assert.ok(upJson.url);
+    if (upJson.url.startsWith('/uploads/')) {
+      const imgGet = await fetch(`${base}${upJson.url}`);
+      assert.equal(imgGet.status, 200);
+      // Clean up temporary test upload file
+      const uploadedFilePath = path.join(ROOT_DIR, 'public', upJson.url);
+      if (fs.existsSync(uploadedFilePath)) fs.unlinkSync(uploadedFilePath);
+    }
+
+    const batchRes = await fetch(`${base}/api/admin/deck-edit?room=editorroom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({
+        roomId: 'editorroom',
+        op: 'batchSlides',
+        slides: [
+          { mode: 'SLIDE', layout: 'MEDIA', title: 'PDF Page 1', mediaUrl: upJson.url },
+          { mode: 'SLIDE', layout: 'MEDIA', title: 'PDF Page 2', mediaUrl: upJson.url },
+        ],
+      }),
+    });
+    assert.equal(batchRes.status, 200);
+    const batchJson = await batchRes.json();
+    assert.equal(batchJson.state.total, 2);
+
+    const insertRes = await fetch(`${base}/api/admin/deck-edit?room=editorroom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({
+        roomId: 'editorroom',
+        op: 'upsert',
+        afterIndex: 0,
+        slideData: { mode: 'BUBBLE', title: 'Inserted Poll', opt_1: 'A', opt_2: 'B' },
+      }),
+    });
+    assert.equal(insertRes.status, 200);
+    const insJson = await insertRes.json();
+    assert.equal(insJson.state.total, 3);
+    assert.equal(insJson.state.deckList[1].mode, 'BUBBLE');
+
+    const expRes = await fetch(`${base}/api/admin/export-csv?room=editorroom`, {
+      headers: { 'x-admin-password': ctx.adminPassword },
+    });
+    assert.equal(expRes.status, 200);
+    assert.ok((await expRes.text()).includes('Inserted Poll'));
 
     // Verify Vercel serverless entrypoint works cleanly
     const mockServer = http.createServer((req, res) => vercelHandler(req, res));

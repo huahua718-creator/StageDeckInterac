@@ -5,8 +5,9 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
-import { listPresets, loadDeckFromCsvTexts, loadDeckPackage, loadPreset } from './sheets.mjs';
+import { deckToCsvText, listPresets, loadDeckFromCsvTexts, loadDeckPackage, loadPreset } from './sheets.mjs';
 import { createRoomStore, sanitizeRoomId } from './store.mjs';
+import { generateSlideIllustration, saveDataUrlImage } from './media.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -214,13 +215,18 @@ export async function createAppContext() {
       if (req.method === 'GET' && pathname === '/admin') return sendHtml(req, res, 'admin');
       if (req.method === 'GET' && pathname === '/remote') return sendHtml(req, res, 'remote');
 
-      // Static assets
-      if (req.method === 'GET' && pathname.startsWith('/assets/')) {
+      // Static assets & local uploads
+      if (req.method === 'GET' && (pathname.startsWith('/assets/') || pathname.startsWith('/uploads/'))) {
         const rel = path.normalize(pathname).replace(/^(\.\.[/\\])+/, '');
         const filePath = path.join(PUBLIC_DIR, rel);
         if (filePath.startsWith(PUBLIC_DIR) && fs.existsSync(filePath)) {
           const ext = path.extname(filePath).toLowerCase();
-          const mime = ext === '.svg' ? 'image/svg+xml' : ext === '.png' ? 'image/png' : 'application/octet-stream';
+          const mime =
+            ext === '.svg' ? 'image/svg+xml' :
+            ext === '.png' ? 'image/png' :
+            ext === '.webp' ? 'image/webp' :
+            (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg' :
+            'application/octet-stream';
           res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' });
           res.end(fs.readFileSync(filePath));
           return;
@@ -385,6 +391,8 @@ export async function createAppContext() {
         return sendJson(res, 200, {
           ok: true,
           remoteToken,
+          hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+          hasBlobStorage: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
           state: await store.getAdminState(targetRoom),
         });
       }
@@ -397,6 +405,8 @@ export async function createAppContext() {
         return sendJson(res, 200, {
           ...(await store.getAdminState(roomId)),
           remoteToken,
+          hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY),
+          hasBlobStorage: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
         });
       }
 
@@ -483,6 +493,85 @@ export async function createAppContext() {
           source: loaded.source,
           state: await store.getAdminState(targetRoom),
         });
+      }
+
+      // Admin Upload Slide Image / PDF Page to Vercel Blob (or local uploads)
+      if (req.method === 'POST' && pathname === '/api/admin/upload-media') {
+        const body = await readJsonBody(req, 4500000);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const saved = await saveDataUrlImage({
+          dataUrl: body.dataUrl,
+          filenamePrefix: body.filenamePrefix || 'slide',
+        });
+        return sendJson(res, 200, { ok: true, url: saved.url, storage: saved.storage });
+      }
+
+      // Admin AI Generate Illustration (Gemini Nano Banana 2.1 -> Vercel Blob)
+      if (req.method === 'POST' && pathname === '/api/admin/generate-image') {
+        const body = await readJsonBody(req);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const targetRoom = sanitizeRoomId(body.roomId || roomId);
+        const curState = await store.getAdminState(targetRoom);
+        const apiKey = req.headers['x-gemini-api-key'] || body.geminiApiKey || '';
+        const saved = await generateSlideIllustration({
+          apiKey,
+          prompt: body.prompt || '',
+          title: body.title || '',
+          subtitle: body.subtitle || '',
+          bgTheme: curState.config?.bg_theme || 'DARK_NEBULA',
+          primaryColor: curState.config?.primary_color || '#6366f1',
+        });
+        if (body.slideIndex !== undefined && body.slideIndex !== null) {
+          await store.mutateDeck(targetRoom, {
+            op: 'setSlideMedia',
+            index: Number(body.slideIndex),
+            mediaUrl: saved.url,
+            imagePrompt: body.prompt || '',
+          });
+        }
+        return sendJson(res, 200, {
+          ok: true,
+          url: saved.url,
+          storage: saved.storage,
+          state: await store.getAdminState(targetRoom),
+        });
+      }
+
+      // Admin Visual Deck Editor (upsert, move, delete, batchSlides, updateConfig)
+      if (req.method === 'POST' && pathname === '/api/admin/deck-edit') {
+        const body = await readJsonBody(req, 2097152);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const targetRoom = sanitizeRoomId(body.roomId || roomId);
+        if (body.op === 'updateConfig') {
+          await store.updateConfig(targetRoom, body.config || {});
+        } else {
+          await store.mutateDeck(targetRoom, body);
+        }
+        return sendJson(res, 200, {
+          ok: true,
+          state: await store.getAdminState(targetRoom),
+        });
+      }
+
+      // Admin Export current deck as CSV
+      if (req.method === 'GET' && pathname === '/api/admin/export-csv') {
+        if (!isAuthorized(req, null)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const st = await store.getAdminState(roomId);
+        const csv = deckToCsvText(st.deckList || []);
+        res.writeHead(200, {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': `attachment; filename="deck-${roomId}.csv"`,
+        });
+        res.end(csv);
+        return;
       }
 
       res.writeHead(404);

@@ -146,7 +146,18 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
 .quote-attr{font-size:clamp(16px,1.4vw,22px);color:var(--muted);font-weight:700;letter-spacing:.5px}
 
 /* Layout: BULLETS */
-.layout-bullets{max-width:1120px;margin:0 auto}
+.layout-bullets{max-width:1160px;margin:0 auto}
+.bullets-with-media{display:grid;grid-template-columns:1.2fr .95fr;gap:34px;align-items:center}
+@media(max-width:960px){.bullets-with-media{grid-template-columns:1fr}}
+.illus-card{
+  background:var(--surface);border:1.5px solid var(--primary-border);
+  border-radius:24px;padding:12px;box-shadow:var(--shadow);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.illus-card img{width:100%;max-height:54vh;object-fit:contain;border-radius:16px;display:block}
+.cover-illus{margin-top:18px;max-height:24vh;max-width:100%;border-radius:16px;border:1px solid var(--border);box-shadow:var(--shadow);object-fit:cover}
+.quote-with-media{display:grid;grid-template-columns:1.35fr .75fr;gap:36px;align-items:center;max-width:1160px;margin:0 auto;text-align:left}
+@media(max-width:960px){.quote-with-media{grid-template-columns:1fr;text-align:center}}
 .slide-h{font-size:clamp(30px,3.4vw,52px);font-weight:900;line-height:1.22;margin:0 0 10px}
 .slide-sub{font-size:clamp(16px,1.5vw,24px);color:var(--muted);margin:0 0 28px}
 .bullet-list{display:flex;flex-direction:column;gap:16px}
@@ -633,6 +644,7 @@ function renderSlideDOM(s) {
           <h1 class="cover-title">${esc(s.title)}</h1>
           ${s.subtitle ? `<p class="cover-sub">${esc(s.subtitle)}</p>` : ''}
           ${s.body ? `<div class="cover-body">${esc(s.body)}</div>` : ''}
+          ${s.mediaUrl ? `<div><img class="cover-illus" src="${esc(s.mediaUrl)}" alt="${esc(s.title)}"></div>` : ''}
         </div>
         <div class="cover-qr-card">
           <div class="cover-qr-box"><img id="coverQrImg" src="${qrSrc}" alt="QR Code"></div>
@@ -642,31 +654,46 @@ function renderSlideDOM(s) {
       </div>`;
   } else if (layout === 'QUOTE') {
     const parts = s.bullets?.length ? s.bullets : (s.body ? [s.body] : []);
-    innerEl.innerHTML = `
-      <div class="layout-quote">
-        <div class="quote-mark">“</div>
-        <h1 class="quote-main">${esc(parts[0] || s.title)}</h1>
-        ${parts[1] ? `<p class="quote-trans">${esc(parts[1])}</p>` : ''}
-        <div class="quote-attr">— ${esc(s.subtitle || s.title)}</div>
-      </div>`;
+    if (s.mediaUrl) {
+      innerEl.innerHTML = `
+        <div class="quote-with-media">
+          <div>
+            <div class="quote-mark">“</div>
+            <h1 class="quote-main">${esc(parts[0] || s.title)}</h1>
+            ${parts[1] ? `<p class="quote-trans">${esc(parts[1])}</p>` : ''}
+            <div class="quote-attr">— ${esc(s.subtitle || s.title)}</div>
+          </div>
+          <div class="illus-card"><img src="${esc(s.mediaUrl)}" alt="${esc(s.title)}"></div>
+        </div>`;
+    } else {
+      innerEl.innerHTML = `
+        <div class="layout-quote">
+          <div class="quote-mark">“</div>
+          <h1 class="quote-main">${esc(parts[0] || s.title)}</h1>
+          ${parts[1] ? `<p class="quote-trans">${esc(parts[1])}</p>` : ''}
+          <div class="quote-attr">— ${esc(s.subtitle || s.title)}</div>
+        </div>`;
+    }
   } else if (layout === 'BULLETS') {
     const items = s.bullets || [];
     const step = s.subStep || 0;
+    const listHtml = `
+      <div class="bullet-list">
+        ${items.map((txt, i) => {
+          const visible = i < step;
+          const isCur = i === step - 1;
+          return `<div class="bullet-item ${visible ? (isCur ? 'current-step' : '') : 'hidden-step'}">
+            <span class="bullet-num">${i + 1}</span>
+            <span>${esc(txt)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="step-hint">漸進重點展開：${Math.min(step, items.length)} / ${items.length} ${step < items.length ? '（按簡報筆下一頁展開下一點）' : '（已全部展開，再按一次前往下一頁）'}</div>`;
     innerEl.innerHTML = `
       <div class="layout-bullets">
         <h1 class="slide-h">${esc(s.title)}</h1>
         ${s.subtitle ? `<p class="slide-sub">${esc(s.subtitle)}</p>` : ''}
-        <div class="bullet-list">
-          ${items.map((txt, i) => {
-            const visible = i < step;
-            const isCur = i === step - 1;
-            return `<div class="bullet-item ${visible ? (isCur ? 'current-step' : '') : 'hidden-step'}">
-              <span class="bullet-num">${i + 1}</span>
-              <span>${esc(txt)}</span>
-            </div>`;
-          }).join('')}
-        </div>
-        <div class="step-hint">漸進重點展開：${Math.min(step, items.length)} / ${items.length} ${step < items.length ? '（按簡報筆下一頁展開下一點）' : '（已全部展開，再按一次前往下一頁）'}</div>
+        ${s.mediaUrl ? `<div class="bullets-with-media"><div>${listHtml}</div><div class="illus-card"><img src="${esc(s.mediaUrl)}" alt="${esc(s.title)}"></div></div>` : listHtml}
       </div>`;
   } else if (layout === 'SPLIT') {
     const left = s.columns?.left || [];

@@ -181,8 +181,10 @@ function render(){
       const cards=state.cardsSpec?.cards||[];
       html+=cards.map((c,i)=>`<div class="split-blk"><h3>${esc((c.tag?c.tag+' · ':'')+c.title)}</h3>${c.desc?`<div style="font-size:14px;color:var(--muted)">${esc(c.desc)}</div>`:''}</div>`).join('');
     }else if(state.bullets?.length){
+      if(state.mediaUrl)html+=`<img class="media-img" style="margin-bottom:10px" src="${esc(state.mediaUrl)}" alt="配圖">`;
       html+=`<ul class="bullet-ul">${state.bullets.map((b,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(b)}</span></li>`).join('')}</ul>`;
     }else if(state.body){
+      if(state.mediaUrl)html+=`<img class="media-img" style="margin-bottom:10px" src="${esc(state.mediaUrl)}" alt="配圖">`;
       html+=`<div class="msg info" style="text-align:left">${esc(state.body)}</div>`;
     }
     html+=`<div class="bm-bar">

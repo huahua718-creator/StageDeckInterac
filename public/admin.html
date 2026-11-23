@@ -3,42 +3,59 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>控場與講師提詞端 — StageDeckInteract</title>
+<title>視覺化講座編排與控場後台 — StageDeckInteract</title>
 <style>
 :root{--bg:#0b1120;--panel:#131d31;--border:#26344d;--text:#f8fafc;--muted:#94a3b8;--accent:#6366f1;--sky:#38bdf8;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC","Microsoft JhengHei",-apple-system,sans-serif;padding:20px}
-.container{max-width:1180px;margin:0 auto}
+.container{max-width:1240px;margin:0 auto}
 .login-box{max-width:400px;margin:80px auto;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:28px}
-h1,h2,h3{margin:0 0 12px}
-.grid{display:grid;grid-template-columns:1.25fr 1fr;gap:18px}
-@media(max-width:900px){.grid{grid-template-columns:1fr}}
+h1,h2,h3{margin:0 0 10px}
+.grid{display:grid;grid-template-columns:1.35fr .95fr;gap:18px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:920px){.grid,.grid-2{grid-template-columns:1fr}}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:18px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-input[type=text],input[type=password]{flex:1;min-width:180px;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:14px}
-button{padding:10px 15px;border:0;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;background:#1e293b;color:var(--text);transition:opacity .15s}
-button:hover{opacity:.9}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  padding:10px 12px;border-radius:10px;border:1px solid var(--border);
+  background:#091020;color:var(--text);font-size:14px;font-family:inherit;
+}
+input[type=text],input[type=password]{flex:1;min-width:160px}
+button{padding:9px 14px;border:0;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;background:#1e293b;color:var(--text);transition:opacity .15s}
+button:hover:not(:disabled){opacity:.9}
+button:disabled{opacity:.45;cursor:not-allowed}
 button.primary{background:var(--accent);color:#fff}
 button.sky{background:var(--sky);color:#061224}
 button.ok{background:var(--ok);color:#052e16}
 button.warn{background:var(--warn);color:#2a1800}
 button.bad{background:var(--bad);color:#fff}
 button.ghost{border:1px solid var(--border);background:transparent}
-.q-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;cursor:pointer;gap:10px;font-size:14px}
-.q-item.active{border-color:var(--sky);background:rgba(56,189,248,.14)}
-.tag{font-size:12px;padding:3px 8px;border-radius:6px;background:rgba(148,163,184,.15);color:#cbd5e1;font-weight:700}
+button.xs{padding:5px 8px;font-size:12px;border-radius:8px}
+.q-item{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--border);margin-bottom:8px;gap:10px;font-size:14px;background:#0e172a}
+.q-item.active{border-color:var(--sky);background:rgba(56,189,248,.13)}
+.q-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;cursor:pointer}
+.q-thumb{width:54px;height:32px;border-radius:6px;object-fit:cover;border:1px solid var(--border);flex-shrink:0;background:#060b18}
+.q-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.tag{font-size:11px;padding:3px 8px;border-radius:6px;background:rgba(148,163,184,.15);color:#cbd5e1;font-weight:700;white-space:nowrap}
 .tag.ok{background:rgba(34,197,94,.18);color:#86efac}
 .tag.warn{background:rgba(245,158,11,.18);color:#fcd34d}
 .status-bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:18px}
 .msg-item{padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#0c1426;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .msg-item.spot{border-color:var(--warn);background:rgba(245,158,11,.12)}
 .msg-item.hid{opacity:.45}
-.teleprompter{
-  background:linear-gradient(155deg,#0f172a,#1e1b4b);
-  border:1.5px solid rgba(99,102,241,.45);border-radius:16px;padding:18px 20px;margin-bottom:18px;
-}
-.note-body{font-size:19px;line-height:1.65;color:#f8fafc;margin:8px 0 12px;white-space:pre-wrap}
+.teleprompter{background:linear-gradient(155deg,#0f172a,#1e1b4b);border:1.5px solid rgba(99,102,241,.45);border-radius:16px;padding:18px 20px;margin-bottom:18px}
+.note-body{font-size:18px;line-height:1.65;color:#f8fafc;margin:8px 0 12px;white-space:pre-wrap}
 .next-preview{font-size:13px;color:var(--muted);padding-top:10px;border-top:1px dashed rgba(148,163,184,.25)}
+.dropzone{border:2px dashed rgba(56,189,248,.45);border-radius:14px;padding:16px;text-align:center;background:rgba(56,189,248,.05);cursor:pointer;transition:background .15s}
+.dropzone:hover{background:rgba(56,189,248,.11)}
+.progress-bar{height:8px;border-radius:99px;background:#091020;overflow:hidden;margin-top:10px;display:none}
+.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--sky));transition:width .2s}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(2,6,23,.84);z-index:60;align-items:center;justify-content:center;padding:18px}
+.modal-bg.show{display:flex}
+.modal-card{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:22px;width:100%;max-width:780px;max-height:90vh;overflow-y:auto}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.field input,.field select,.field textarea{width:100%}
 .muted{color:var(--muted);font-size:13px}
 a{color:var(--sky)}
 </style>
@@ -46,7 +63,7 @@ a{color:var(--sky)}
 <body>
 <div class="container">
   <div id="loginView" class="login-box">
-    <h2>🎛 控場與講師提詞端</h2>
+    <h2>🎛 視覺化講座編排與控場後台</h2>
     <p class="muted" style="margin-bottom:16px">請輸入控場密碼（預設 <code>2026</code>，可於環境變數 <code>ADMIN_PASSWORD</code> 修改）</p>
     <div class="row" style="margin-bottom:10px">
       <input id="roomInputLogin" type="text" placeholder="房間代碼（預設 main）">
@@ -61,9 +78,10 @@ a{color:var(--sky)}
   <div id="mainView" style="display:none">
     <div class="status-bar">
       <div>
-        <div class="row" style="gap:10px;margin-bottom:4px">
-          <h1 style="margin:0">🎛 控場與提詞後台</h1>
+        <div class="row" style="gap:8px;margin-bottom:4px">
+          <h1 style="margin:0;font-size:24px">🎛 講座工作台與即時控場</h1>
           <span id="storageBadge" class="tag">載入中</span>
+          <span id="blobBadge" class="tag">圖床檢查中</span>
           <span id="roomBadge" class="tag">Room: main</span>
         </div>
         <span id="sourceInfo" class="muted">載入中...</span>
@@ -78,7 +96,7 @@ a{color:var(--sky)}
     <div id="remoteCard" class="card" style="display:none;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;border-color:rgba(56,189,248,.45)">
       <div style="flex:1;min-width:240px">
         <h3 style="margin-bottom:6px">📱 講者手機隨身遙控器（含提詞與翻頁）</h3>
-        <p class="muted" style="margin:0 0 10px">講者用手機掃描右側 QR Code，即可免密碼開啟手機遙控器與隨身口白提詞。</p>
+        <p class="muted" style="margin:0 0 10px">掃描右側 QR Code，免密碼開啟手機遙控器與隨身口白提詞。</p>
         <div class="row">
           <a id="remoteLink" href="/remote" target="_blank"><button class="ghost">🔗 開啟遙控器</button></a>
           <button id="copyRemoteBtn" class="ghost">📋 複製遙控網址</button>
@@ -90,44 +108,67 @@ a{color:var(--sky)}
       </div>
     </div>
 
-    <div class="card">
-      <h3>📊 講題腳本來源與熱重載 (Zero-Code CMS)</h3>
-      <p class="muted" style="margin:0 0 10px">
-        支援貼上 <b>Google Sheets（發布 CSV）</b>、<b>Google Docs 公開連結</b> 或 <b>Google Drive 檔案（.md / .csv / .json）</b>，亦支援內建快速生圖（<code>DIAGRAM</code> / <code>CHART</code> / <code>CARDS</code>）。
-        下載範本：<a href="/api/sample-deck.csv" download>Deck 範本 (.csv)</a> ｜ <a href="/api/sample-config.csv" download>Config 範本 (.csv)</a>
-      </p>
-      <div class="row" style="margin-bottom:10px">
-        <input id="deckInput" type="text" placeholder="貼上 Google Sheets / Google Docs / Google Drive (.md/.csv/.json) 公開連結">
-        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:260px">
-        <button id="syncBtn" class="primary">🔄 熱重載更新</button>
+    <!-- 方案一 + 方案二：PDF/圖片簡報匯入 & AI 一鍵產插圖 -->
+    <div class="grid-2">
+      <div class="card">
+        <h3>📄 方案一：匯入 NotebookLM / Canva PDF 簡報或圖片</h3>
+        <p class="muted" style="margin:0 0 10px">將 NotebookLM 做出來的 <b>PDF 簡報</b>或<b>多張圖片</b>直接拖進來，自動切頁上傳至雲端圖床，之後可在任意頁間插入互動題！</p>
+        <div id="pdfDropzone" class="dropzone">
+          <div style="font-weight:800;margin-bottom:4px">點擊選擇或拖曳 <code>.pdf</code> / 多張圖片（PNG、JPG、WebP）</div>
+          <div class="muted">單檔建議 50 頁以內，瀏覽器自動壓縮渲染</div>
+          <input id="pdfFileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp" multiple style="display:none">
+        </div>
+        <div class="row" style="margin-top:10px;justify-content:space-between">
+          <div class="row">
+            <label class="muted"><input type="radio" name="importMode" value="replace" checked> 覆蓋目前簡報</label>
+            <label class="muted"><input type="radio" name="importMode" value="append"> 追加到結尾</label>
+          </div>
+          <span id="pdfStatus" class="muted"></span>
+        </div>
+        <div id="pdfProgressBar" class="progress-bar"><div id="pdfProgressFill" class="progress-fill"></div></div>
       </div>
-      <div class="row" style="margin-bottom:10px;padding-top:10px;border-top:1px dashed var(--border)">
-        <select id="presetSelect" style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:14px"></select>
-        <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
-        <label class="muted" style="display:flex;align-items:center;gap:6px">
-          本機檔案(.md/.csv/.json)：<input id="csvFileInput" type="file" accept=".csv,.md,.markdown,.txt,.json" style="max-width:200px;font-size:12px">
-        </label>
-        <button id="uploadCsvBtn" class="ghost">📤 匯入檔案</button>
-        <button id="promptBtn" class="sky">✨ 複製 NotebookLM 提示詞</button>
-      </div>
-      <div class="row" style="justify-content:space-between">
-        <span id="syncMsg" class="muted"></span>
-        <span id="shareUrlPreview" class="muted"></span>
+
+      <div class="card">
+        <h3>🎨 方案二：AI 一鍵為簡報生成專屬插圖（Nano Banana 2.1）</h3>
+        <p class="muted" style="margin:0 0 10px">自動為 <code>COVER</code> / <code>BULLETS</code> / <code>QUOTE</code> 頁面補上與主題色一致的插畫（大螢幕自動切換為「左文右圖」排版）。</p>
+        <div class="row" style="margin-bottom:10px">
+          <input id="geminiKeyInput" type="password" placeholder="輸入 GEMINI_API_KEY（若 Vercel 環境變數已設可留空）">
+          <span id="geminiKeyBadge" class="tag">未設定 Key</span>
+        </div>
+        <div class="row">
+          <button id="batchAiImgBtn" class="primary">✨ 一鍵為全部缺圖簡報 AI 生圖</button>
+          <button id="themeModalBtn" class="ghost">🎨 修改標題與配色</button>
+        </div>
+        <div id="aiStatus" class="muted" style="margin-top:8px"></div>
+        <div id="aiProgressBar" class="progress-bar"><div id="aiProgressFill" class="progress-fill"></div></div>
       </div>
     </div>
 
-    <div id="promptModal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:60;align-items:center;justify-content:center;padding:20px">
-      <div class="card" style="max-width:760px;width:100%;max-height:86vh;overflow-y:auto;border-color:var(--sky)">
-        <div class="row" style="justify-content:space-between;margin-bottom:10px">
-          <h3 style="margin:0">✨ NotebookLM 專用簡報＋自動生圖 Prompt</h3>
-          <button onclick="document.getElementById('promptModal').style.display='none'" class="ghost">關閉</button>
+    <!-- 進階資料來源：Google Sheets / CSV / 內建範本 -->
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <h3 style="margin:0">📊 Google Sheets 試算表同步與範本工具</h3>
+        <div class="row">
+          <button id="promptBtn" class="sky xs">✨ 複製 NotebookLM 產 Google Sheets Prompt</button>
+          <a id="exportCsvLink" href="/api/admin/export-csv" target="_blank"><button class="ghost xs">💾 匯出目前講題 (.csv)</button></a>
         </div>
-        <p class="muted" style="margin:0 0 10px">複製貼進 NotebookLM 後，將產出匯出至 Google Docs（開啟「知道連結者可檢視」）或存成 <code>.md</code> 丟進 Google Drive，再貼上連結即可自動生成投影片＋向量圖表！</p>
-        <textarea id="nlmPromptText" rows="15" style="width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:13px;line-height:1.55" readonly></textarea>
-        <div class="row" style="margin-top:12px">
-          <button id="copyNlmPromptBtn" class="primary">📋 一鍵複製 Prompt</button>
-          <span id="nlmCopyTip" class="muted"></span>
-        </div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input id="deckInput" type="text" placeholder="貼上 Google Sheets 發布 CSV 連結（或試算表分享連結）">
+        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:250px">
+        <button id="syncBtn" class="primary">🔄 熱重載</button>
+      </div>
+      <div class="row" style="padding-top:10px;border-top:1px dashed var(--border)">
+        <select id="presetSelect" style="flex:1;min-width:220px"></select>
+        <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
+        <label class="muted" style="display:flex;align-items:center;gap:6px">
+          匯入 CSV / JSON：<input id="csvFileInput" type="file" accept=".csv,.json" style="max-width:190px;font-size:12px">
+        </label>
+        <button id="uploadCsvBtn" class="ghost">📤 匯入</button>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:6px">
+        <span id="syncMsg" class="muted"></span>
+        <span id="shareUrlPreview" class="muted"></span>
       </div>
     </div>
 
@@ -164,8 +205,14 @@ a{color:var(--sky)}
         </div>
 
         <div class="card">
-          <h3>📑 全場投影片與互動腳本（點擊跳轉）</h3>
-          <div id="deckList" style="max-height:460px;overflow-y:auto"></div>
+          <div class="row" style="justify-content:space-between;margin-bottom:10px">
+            <h3 style="margin:0">📑 視覺化講題編排器（點擊切換・可插題與配圖）</h3>
+            <div class="row">
+              <button id="addSlideBtn" class="ghost xs">➕ 新增簡報頁</button>
+              <button id="addInterBtn" class="sky xs">➕ 插入互動題</button>
+            </div>
+          </div>
+          <div id="deckList" style="max-height:520px;overflow-y:auto"></div>
         </div>
       </div>
 
@@ -173,12 +220,140 @@ a{color:var(--sky)}
         <div class="card">
           <div class="row" style="justify-content:space-between;margin-bottom:10px">
             <h3 style="margin:0">💬 彈幕審核與中央聚焦牆</h3>
-            <button id="clearSpotBtn" class="ghost" style="padding:6px 10px;font-size:12px">取消聚焦</button>
+            <button id="clearSpotBtn" class="ghost xs">取消聚焦</button>
           </div>
           <p class="muted" style="margin:0 0 12px">在 <code>DANMAKU</code> 頁面時，點擊「推上聚焦」可將留言放大顯示於大螢幕正中央。</p>
           <div id="msgList" style="max-height:560px;overflow-y:auto"></div>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 投影片 / 互動題編輯器 Modal -->
+<div id="editorModal" class="modal-bg">
+  <div class="modal-card">
+    <div class="row" style="justify-content:space-between;margin-bottom:14px">
+      <h3 id="editorTitle" style="margin:0">✏️ 編輯頁面與配圖</h3>
+      <button onclick="closeEditor()" class="ghost xs">關閉</button>
+    </div>
+    <div class="grid-2">
+      <div class="field">
+        <label>頁面模式 (mode)</label>
+        <select id="edMode">
+          <option value="SLIDE">SLIDE（簡報講義頁）</option>
+          <option value="BUBBLE">BUBBLE（物理碰撞氣泡投票）</option>
+          <option value="SPECTRUM">SPECTRUM（理念天平 / 雙向拔河）</option>
+          <option value="MYTH">MYTH（破除迷思限時搶答）</option>
+          <option value="QUADRANT">QUADRANT（二維心態落點矩陣）</option>
+          <option value="TREE">TREE（星空共育願景之樹）</option>
+          <option value="DANMAKU">DANMAKU（滾動彈幕 Q&A）</option>
+        </select>
+      </div>
+      <div id="edLayoutWrap" class="field">
+        <label>簡報版型 (layout)</label>
+        <select id="edLayout">
+          <option value="COVER">COVER（封面 + QR 卡片）</option>
+          <option value="BULLETS">BULLETS（漸進條列，有圖自動變左文右圖）</option>
+          <option value="SPLIT">SPLIT（雙欄對比，:: 分左右欄）</option>
+          <option value="QUOTE">QUOTE（金句引言，| 分中英對照）</option>
+          <option value="MEDIA">MEDIA（全幅圖片 / PDF 投影頁）</option>
+          <option value="CARDS">CARDS（流程卡片）</option>
+          <option value="CHART">CHART（數據圖表）</option>
+          <option value="DIAGRAM">DIAGRAM（Mermaid 流程圖）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field"><label>主標題 / 核心提問 (title)</label><input id="edTitle" type="text"></div>
+    <div class="field"><label>副標題 / 作答說明 (subtitle)</label><input id="edSubtitle" type="text"></div>
+
+    <div id="edSlideFields">
+      <div class="field">
+        <label>內文 (body) — 條列用 <code>|</code> 分隔，雙欄對比用 <code>::</code> 分左右欄</label>
+        <textarea id="edBody" rows="3"></textarea>
+      </div>
+      <div class="card" style="background:#0c1426;margin-bottom:12px">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <strong style="font-size:13px">🖼 本頁插圖 / 簡報圖檔設定</strong>
+          <div class="row">
+            <label style="cursor:pointer"><input id="edUploadImg" type="file" accept="image/png,image/jpeg,image/webp" style="display:none"><span class="tag" style="cursor:pointer;background:rgba(56,189,248,.2);color:var(--sky)">📤 上傳本機圖片</span></label>
+            <button type="button" id="edAiGenBtn" class="primary xs">🎨 AI 依提示詞生成插圖</button>
+            <button type="button" id="edClearImgBtn" class="ghost xs">清除</button>
+          </div>
+        </div>
+        <div class="field"><label>AI 生圖描述 (image_prompt，留空則依標題自動構思)</label><input id="edImgPrompt" type="text" placeholder="例如：老師在星空下輕鬆喝咖啡，電腦自動整理考卷的扁平向量插畫"></div>
+        <div class="field"><label>圖片網址 (media_url)</label><input id="edMediaUrl" type="text" placeholder="https://... 或上傳 / AI 生成自動填入"></div>
+        <div id="edImgPreviewWrap" style="display:none;text-align:center;margin-top:8px">
+          <img id="edImgPreview" style="max-height:180px;max-width:100%;border-radius:10px;border:1px solid var(--border)">
+        </div>
+        <div id="edImgMsg" class="muted" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+    <div id="edInterFields" style="display:none">
+      <div class="grid-2">
+        <div class="field"><label>選項 1 / X 軸 / 左陣營 (opt_1)</label><input id="edOpt1" type="text"></div>
+        <div class="field"><label>選項 2 / Y 軸 / 右陣營 (opt_2)</label><input id="edOpt2" type="text"></div>
+        <div class="field"><label>選項 3 (opt_3)</label><input id="edOpt3" type="text"></div>
+        <div class="field"><label>選項 4 (opt_4)</label><input id="edOpt4" type="text"></div>
+      </div>
+      <div id="edMythExtra" class="grid-2" style="display:none">
+        <div class="field">
+          <label>正確答案欄位 (correct_opt)</label>
+          <select id="edCorrect"><option value="opt_1">opt_1</option><option value="opt_2">opt_2</option><option value="opt_3">opt_3</option><option value="opt_4">opt_4</option></select>
+        </div>
+        <div class="field"><label>倒數秒數 (timer_sec，0 = 手動截止)</label><input id="edTimer" type="number" min="0" value="15"></div>
+      </div>
+      <div id="edMythExpWrap" class="field" style="display:none"><label>揭曉後解析文字 (explanation)</label><input id="edExplanation" type="text"></div>
+    </div>
+
+    <div class="field"><label>講者口白提詞 (speaker_note)</label><textarea id="edNote" rows="2"></textarea></div>
+    <div class="row" style="justify-content:flex-end;margin-top:14px">
+      <button onclick="closeEditor()" class="ghost">取消</button>
+      <button id="edSaveBtn" class="primary">💾 儲存並套用到線上簡報</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主題設定 Modal -->
+<div id="themeModal" class="modal-bg">
+  <div class="modal-card" style="max-width:520px">
+    <div class="row" style="justify-content:space-between;margin-bottom:12px">
+      <h3 style="margin:0">🎨 修改講座標題與視覺主題</h3>
+      <button onclick="$('themeModal').classList.remove('show')" class="ghost xs">關閉</button>
+    </div>
+    <div class="field"><label>活動主標題 (event_title)</label><input id="cfgTitle" type="text"></div>
+    <div class="field"><label>副標題 (event_subtitle)</label><input id="cfgSub" type="text"></div>
+    <div class="grid-2">
+      <div class="field"><label>主題色票 (primary_color)</label><input id="cfgColor" type="text" placeholder="#6366f1"></div>
+      <div class="field">
+        <label>背景風格 (bg_theme)</label>
+        <select id="cfgTheme">
+          <option value="DARK_NEBULA">DARK_NEBULA（深邃星空）</option>
+          <option value="CLEAN_LIGHT">CLEAN_LIGHT（簡約明亮）</option>
+          <option value="TECH_GRID">TECH_GRID（科技網格）</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button id="saveThemeBtn" class="primary">💾 儲存主題</button>
+    </div>
+  </div>
+</div>
+
+<!-- NotebookLM Google Sheets Prompt Modal -->
+<div id="promptModal" class="modal-bg">
+  <div class="modal-card">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">✨ NotebookLM 產生 Google Sheets 表格專用提示詞</h3>
+      <button onclick="$('promptModal').classList.remove('show')" class="ghost xs">關閉</button>
+    </div>
+    <p class="muted" style="margin:0 0 10px">把這段貼給 NotebookLM，它會直接產出好貼進 Google 試算表的 CSV 表格，並自動幫每一頁寫好 <code>image_prompt</code>，匯入後再按一鍵 AI 產圖即可！</p>
+    <textarea id="nlmPromptText" rows="13" readonly style="font-size:13px;line-height:1.55"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="copyNlmPromptBtn" class="primary">📋 一鍵複製 Prompt</button>
+      <span id="nlmCopyTip" class="muted"></span>
     </div>
   </div>
 </div>
@@ -190,7 +365,12 @@ let roomId = urlParams.get('room') || 'main';
 $('roomInputLogin').value = roomId;
 
 let pwd = sessionStorage.getItem('sdi_admin_pwd') || '';
+let geminiKey = sessionStorage.getItem('sdi_gemini_key') || '';
+$('geminiKeyInput').value = geminiKey;
 let state = null;
+let hasServerGeminiKey = false;
+let hasBlobStorage = false;
+let editCtx = { replaceIndex: null, afterIndex: null };
 
 function esc(s) {
   return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -199,9 +379,11 @@ function esc(s) {
 async function api(url, method = 'GET', body = null) {
   const sep = url.includes('?') ? '&' : '?';
   const fullUrl = `${url}${sep}room=${encodeURIComponent(roomId)}`;
-  const opts = { method, headers: { 'x-admin-password': pwd } };
+  const headers = { 'x-admin-password': pwd };
+  if (geminiKey) headers['x-gemini-api-key'] = geminiKey;
+  const opts = { method, headers };
   if (body) {
-    opts.headers['Content-Type'] = 'application/json';
+    headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify({ roomId, ...body });
   }
   const r = await fetch(fullUrl, opts);
@@ -224,9 +406,12 @@ async function tryLogin(inputPwd) {
     sessionStorage.setItem('sdi_admin_pwd', pwd);
     $('loginView').style.display = 'none';
     $('mainView').style.display = 'block';
+    hasServerGeminiKey = Boolean(res.hasServerGeminiKey);
+    hasBlobStorage = Boolean(res.hasBlobStorage);
     state = res.state;
     $('deckInput').value = state.deckUrl || '';
     $('configInput').value = state.configUrl || '';
+    $('exportCsvLink').href = `/api/admin/export-csv?room=${encodeURIComponent(roomId)}`;
     setupLinks(res.remoteToken);
     loadPresetsList();
     render();
@@ -263,6 +448,26 @@ $('loginBtn').onclick = () => tryLogin($('pwdInput').value);
 $('pwdInput').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };
 if (pwd) tryLogin(pwd);
 
+$('geminiKeyInput').oninput = () => {
+  geminiKey = $('geminiKeyInput').value.trim();
+  sessionStorage.setItem('sdi_gemini_key', geminiKey);
+  updateGeminiBadge();
+};
+
+function updateGeminiBadge() {
+  const b = $('geminiKeyBadge');
+  if (hasServerGeminiKey) {
+    b.className = 'tag ok';
+    b.textContent = '伺服器已設 Key';
+  } else if (geminiKey) {
+    b.className = 'tag ok';
+    b.textContent = '已輸入暫存 Key';
+  } else {
+    b.className = 'tag warn';
+    b.textContent = '需填 Key 才能 AI 生圖';
+  }
+}
+
 async function ctrl(action, extra = {}) {
   const res = await api('/api/admin/control', 'POST', { action, ...extra });
   state = res.state;
@@ -280,18 +485,327 @@ $('resetBtn').onclick = () => { if (confirm('確定清空本頁目前所有互�
 $('clearSpotBtn').onclick = () => ctrl('spotlight', { msgId: null });
 $('burstBtn').onclick = () => ctrl('burst', { count: 30 });
 
+// ---------- 方案一：PDF & 多圖片匯入 ----------
+const drop = $('pdfDropzone');
+const pdfIn = $('pdfFileInput');
+drop.onclick = () => pdfIn.click();
+drop.ondragover = e => { e.preventDefault(); drop.style.background = 'rgba(56,189,248,.18)'; };
+drop.ondragleave = () => { drop.style.background = ''; };
+drop.ondrop = e => {
+  e.preventDefault(); drop.style.background = '';
+  if (e.dataTransfer?.files?.length) handleSlideFiles(e.dataTransfer.files);
+};
+pdfIn.onchange = () => { if (pdfIn.files?.length) handleSlideFiles(pdfIn.files); pdfIn.value = ''; };
+
+function fileToCompressedDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const maxW = 1600;
+      const scale = img.width > maxW ? maxW / img.width : 1;
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(img.width * scale);
+      cv.height = Math.round(img.height * scale);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(objUrl);
+      resolve(cv.toDataURL('image/webp', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('圖片讀取失敗')); };
+    img.src = objUrl;
+  });
+}
+
+let pdfjsLibCache = null;
+async function getPdfJs() {
+  if (!pdfjsLibCache) {
+    pdfjsLibCache = await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs');
+    pdfjsLibCache.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs';
+  }
+  return pdfjsLibCache;
+}
+
+async function handleSlideFiles(fileList) {
+  const files = Array.from(fileList);
+  const append = document.querySelector('input[name="importMode"]:checked')?.value === 'append';
+  const bar = $('pdfProgressBar'), fill = $('pdfProgressFill'), stEl = $('pdfStatus');
+  bar.style.display = 'block'; fill.style.width = '0%';
+
+  try {
+    const slidesToInsert = [];
+    const pdfFile = files.find(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+
+    if (pdfFile) {
+      stEl.textContent = '載入 PDF 解析引擎中...';
+      const pdfjs = await getPdfJs();
+      const pdf = await pdfjs.getDocument({ data: await pdfFile.arrayBuffer() }).promise;
+      const total = Math.min(pdf.numPages, 60);
+
+      for (let p = 1; p <= total; p++) {
+        stEl.textContent = `正在渲染並上傳第 ${p} / ${total} 頁...`;
+        const page = await pdf.getPage(p);
+        const vp1 = page.getViewport({ scale: 1 });
+        const scale = Math.min(2.2, 1600 / vp1.width);
+        const vp = page.getViewport({ scale });
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        const dataUrl = cv.toDataURL('image/webp', 0.84);
+        const up = await api('/api/admin/upload-media', 'POST', { dataUrl, filenamePrefix: `pdf_p${p}` });
+        slidesToInsert.push({
+          mode: 'SLIDE',
+          layout: 'MEDIA',
+          title: `${pdfFile.name.replace(/\.pdf$/i, '')} — 第 ${p} 頁`,
+          subtitle: '',
+          body: `簡報第 ${p} 頁（可於後台補充手機端筆記摘要）`,
+          mediaUrl: up.url,
+          speakerNote: '',
+        });
+        fill.style.width = `${Math.round((p / total) * 100)}%`;
+      }
+    } else {
+      const imgs = files.filter(f => f.type.startsWith('image/'));
+      if (!imgs.length) throw new Error('請選擇 PDF 或 PNG/JPG/WebP 圖片');
+      for (let i = 0; i < imgs.length; i++) {
+        stEl.textContent = `正在上傳第 ${i + 1} / ${imgs.length} 張圖片...`;
+        const dataUrl = await fileToCompressedDataUrl(imgs[i]);
+        const up = await api('/api/admin/upload-media', 'POST', { dataUrl, filenamePrefix: `img_${i + 1}` });
+        slidesToInsert.push({
+          mode: 'SLIDE',
+          layout: 'MEDIA',
+          title: imgs[i].name.replace(/\.[^.]+$/, ''),
+          subtitle: '',
+          body: '',
+          mediaUrl: up.url,
+          speakerNote: '',
+        });
+        fill.style.width = `${Math.round(((i + 1) / imgs.length) * 100)}%`;
+      }
+    }
+
+    stEl.textContent = '寫入簡報資料庫中...';
+    const res = await api('/api/admin/deck-edit', 'POST', {
+      op: 'batchSlides',
+      append,
+      sourceLabel: pdfFile ? `PDF 匯入 (${pdfFile.name})` : '多張圖片匯入',
+      slides: slidesToInsert,
+    });
+    state = res.state;
+    stEl.textContent = `✓ 已成功匯入 ${slidesToInsert.length} 頁簡報！可在下方任意位置插入互動題`;
+    render();
+  } catch (e) {
+    stEl.textContent = `✕ 匯入失敗：${e.message}`;
+  }
+}
+
+// ---------- 方案二：AI 一鍵批次生圖 ----------
+$('batchAiImgBtn').onclick = async () => {
+  if (!hasServerGeminiKey && !geminiKey) {
+    $('aiStatus').textContent = '請先在上方輸入您的 GEMINI_API_KEY！';
+    return;
+  }
+  const targets = (state?.deckList || []).filter(
+    s => s.mode === 'SLIDE' && ['COVER', 'BULLETS', 'QUOTE'].includes(s.layout) && !s.mediaUrl
+  );
+  if (targets.length === 0) {
+    $('aiStatus').textContent = '目前所有 COVER / BULLETS / QUOTE 頁面都已有配圖了！';
+    return;
+  }
+  if (!confirm(`將為 ${targets.length} 頁尚未配圖的投影片呼叫 Gemini Nano Banana 2.1 生成插圖，確定開始？`)) return;
+
+  const btn = $('batchAiImgBtn');
+  btn.disabled = true;
+  $('aiProgressBar').style.display = 'block';
+  let okCount = 0;
+
+  for (let i = 0; i < targets.length; i++) {
+    const s = targets[i];
+    $('aiStatus').textContent = `🎨 AI 正在繪製第 ${i + 1} / ${targets.length} 張：「${s.title}」...`;
+    try {
+      const res = await api('/api/admin/generate-image', 'POST', {
+        slideIndex: s.index,
+        prompt: s.imagePrompt || '',
+        title: s.title,
+        subtitle: s.subtitle,
+      });
+      state = res.state;
+      okCount++;
+      render();
+    } catch (e) {
+      $('aiStatus').textContent = `✕ 第 ${i + 1} 張失敗：${e.message}`;
+      break;
+    }
+    $('aiProgressFill').style.width = `${Math.round(((i + 1) / targets.length) * 100)}%`;
+  }
+  btn.disabled = false;
+  if (okCount === targets.length) {
+    $('aiStatus').textContent = `✓ 已成功為 ${okCount} 頁簡報生成專屬插圖！`;
+  }
+};
+
+// ---------- 主題設定 Modal ----------
+$('themeModalBtn').onclick = () => {
+  const c = state?.config || {};
+  $('cfgTitle').value = c.event_title || '';
+  $('cfgSub').value = c.event_subtitle || '';
+  $('cfgColor').value = c.primary_color || '#6366f1';
+  $('cfgTheme').value = c.bg_theme || 'DARK_NEBULA';
+  $('themeModal').classList.add('show');
+};
+$('saveThemeBtn').onclick = async () => {
+  const res = await api('/api/admin/deck-edit', 'POST', {
+    op: 'updateConfig',
+    config: {
+      event_title: $('cfgTitle').value,
+      event_subtitle: $('cfgSub').value,
+      primary_color: $('cfgColor').value,
+      bg_theme: $('cfgTheme').value,
+    },
+  });
+  state = res.state;
+  $('themeModal').classList.remove('show');
+  render();
+};
+
+// ---------- 視覺化講題編輯器 ----------
+function syncEditorVisibility() {
+  const mode = $('edMode').value;
+  const isSlide = mode === 'SLIDE';
+  $('edLayoutWrap').style.display = isSlide ? 'block' : 'none';
+  $('edSlideFields').style.display = isSlide ? 'block' : 'none';
+  $('edInterFields').style.display = isSlide ? 'none' : 'block';
+  const isMyth = mode === 'MYTH';
+  $('edMythExtra').style.display = isMyth ? 'grid' : 'none';
+  $('edMythExpWrap').style.display = isMyth ? 'block' : 'none';
+}
+$('edMode').onchange = syncEditorVisibility;
+
+function refreshEdImgPreview() {
+  const u = $('edMediaUrl').value.trim();
+  $('edImgPreviewWrap').style.display = u ? 'block' : 'none';
+  if (u) $('edImgPreview').src = u;
+}
+$('edMediaUrl').oninput = refreshEdImgPreview;
+$('edClearImgBtn').onclick = () => { $('edMediaUrl').value = ''; refreshEdImgPreview(); };
+
+$('edUploadImg').onchange = async () => {
+  const f = $('edUploadImg').files?.[0];
+  if (!f) return;
+  $('edImgMsg').textContent = '上傳圖片中...';
+  try {
+    const dataUrl = await fileToCompressedDataUrl(f);
+    const up = await api('/api/admin/upload-media', 'POST', { dataUrl, filenamePrefix: 'ed' });
+    $('edMediaUrl').value = up.url;
+    refreshEdImgPreview();
+    $('edImgMsg').textContent = '✓ 已上傳！記得按下方儲存';
+  } catch (e) {
+    $('edImgMsg').textContent = '✕ 上傳失敗：' + e.message;
+  }
+  $('edUploadImg').value = '';
+};
+
+$('edAiGenBtn').onclick = async () => {
+  $('edImgMsg').textContent = '🎨 AI 繪製插圖中（約需 5~10 秒）...';
+  $('edAiGenBtn').disabled = true;
+  try {
+    const res = await api('/api/admin/generate-image', 'POST', {
+      prompt: $('edImgPrompt').value.trim(),
+      title: $('edTitle').value.trim(),
+      subtitle: $('edSubtitle').value.trim(),
+    });
+    $('edMediaUrl').value = res.url;
+    refreshEdImgPreview();
+    $('edImgMsg').textContent = '✓ AI 插圖已生成！記得按下方儲存套用';
+  } catch (e) {
+    $('edImgMsg').textContent = '✕ AI 生圖失敗：' + e.message;
+  }
+  $('edAiGenBtn').disabled = false;
+};
+
+function openEditor({ replaceIndex = null, afterIndex = null, presetMode = 'SLIDE' }) {
+  editCtx = { replaceIndex, afterIndex };
+  const item = replaceIndex !== null ? state.deckList[replaceIndex] : null;
+  $('editorTitle').textContent = item ? `✏️ 編輯第 ${item.order} 頁` : (presetMode === 'SLIDE' ? '➕ 新增簡報頁面' : '➕ 插入互動題目');
+
+  $('edMode').value = item ? item.mode : presetMode;
+  $('edLayout').value = item ? (item.layout || 'BULLETS') : 'BULLETS';
+  $('edTitle').value = item ? item.title : '';
+  $('edSubtitle').value = item ? (item.subtitle || '') : '';
+  $('edBody').value = item ? (item.body || '') : '';
+  $('edImgPrompt').value = item ? (item.imagePrompt || '') : '';
+  $('edMediaUrl').value = item ? (item.mediaUrl || '') : '';
+  const opts = item?.options || [];
+  $('edOpt1').value = opts[0]?.label || (presetMode === 'QUADRANT' ? 'X 軸指標' : '');
+  $('edOpt2').value = opts[1]?.label || (presetMode === 'QUADRANT' ? 'Y 軸指標' : '');
+  $('edOpt3').value = opts[2]?.label || '';
+  $('edOpt4').value = opts[3]?.label || '';
+  $('edCorrect').value = item?.correctOpt || 'opt_1';
+  $('edTimer').value = item?.timerSec ?? 15;
+  $('edExplanation').value = item?.explanation || '';
+  $('edNote').value = item?.speakerNote || '';
+  $('edImgMsg').textContent = '';
+
+  syncEditorVisibility();
+  refreshEdImgPreview();
+  $('editorModal').classList.add('show');
+}
+function closeEditor() { $('editorModal').classList.remove('show'); }
+
+$('addSlideBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'SLIDE' });
+$('addInterBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'BUBBLE' });
+
+$('edSaveBtn').onclick = async () => {
+  const mode = $('edMode').value;
+  const slideData = {
+    mode,
+    layout: mode === 'SLIDE' ? $('edLayout').value : '',
+    title: $('edTitle').value.trim() || '未命名頁面',
+    subtitle: $('edSubtitle').value.trim(),
+    body: $('edBody').value,
+    mediaUrl: $('edMediaUrl').value.trim(),
+    imagePrompt: $('edImgPrompt').value.trim(),
+    opt_1: $('edOpt1').value.trim(),
+    opt_2: $('edOpt2').value.trim(),
+    opt_3: $('edOpt3').value.trim(),
+    opt_4: $('edOpt4').value.trim(),
+    correctOpt: $('edCorrect').value,
+    timerSec: Number($('edTimer').value) || 0,
+    explanation: $('edExplanation').value.trim(),
+    speakerNote: $('edNote').value.trim(),
+  };
+  const res = await api('/api/admin/deck-edit', 'POST', {
+    op: 'upsert',
+    replaceIndex: editCtx.replaceIndex,
+    afterIndex: editCtx.afterIndex,
+    jumpToNew: true,
+    slideData,
+  });
+  state = res.state;
+  closeEditor();
+  render();
+};
+
+async function moveSlide(index, direction) {
+  const res = await api('/api/admin/deck-edit', 'POST', { op: 'move', index, direction });
+  state = res.state;
+  render();
+}
+async function deleteSlide(index) {
+  if (!confirm('確定刪除此頁嗎？')) return;
+  const res = await api('/api/admin/deck-edit', 'POST', { op: 'delete', index });
+  state = res.state;
+  render();
+}
+
+// ---------- Google Sheets / CSV / Prompt ----------
 $('syncBtn').onclick = async () => {
   $('syncMsg').textContent = '同步中...';
   try {
-    const deckUrl = $('deckInput').value.trim();
-    const configUrl = $('configInput').value.trim();
-    const res = await api('/api/admin/sheet', 'POST', { deckUrl, configUrl });
+    const res = await api('/api/admin/sheet', 'POST', { deckUrl: $('deckInput').value.trim(), configUrl: $('configInput').value.trim() });
     state = res.state;
     $('syncMsg').textContent = `✓ 已載入 ${res.count} 頁（${res.source}）`;
     render();
-  } catch (e) {
-    $('syncMsg').textContent = `✕ 同步失敗：${e.message}`;
-  }
+  } catch (e) { $('syncMsg').textContent = `✕ 同步失敗：${e.message}`; }
 };
 
 async function loadPresetsList() {
@@ -300,125 +814,95 @@ async function loadPresetsList() {
     $('presetSelect').innerHTML = (r.presets || []).map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('');
   } catch {}
 }
-
 $('presetBtn').onclick = async () => {
   const presetId = $('presetSelect').value || 'default';
   $('syncMsg').textContent = '切換範本中...';
   try {
     const res = await api('/api/admin/preset', 'POST', { presetId });
     state = res.state;
-    $('deckInput').value = '';
-    $('configInput').value = '';
-    $('syncMsg').textContent = `✓ 已切換為範本：${res.source}（共 ${res.count} 頁）`;
+    $('deckInput').value = ''; $('configInput').value = '';
+    $('syncMsg').textContent = `✓ 已切換：${res.source}`;
     render();
-  } catch (e) {
-    $('syncMsg').textContent = `✕ 切換失敗：${e.message}`;
-  }
+  } catch (e) { $('syncMsg').textContent = `✕ 切換失敗：${e.message}`; }
 };
-
 $('uploadCsvBtn').onclick = async () => {
   const file = $('csvFileInput').files?.[0];
-  if (!file) {
-    $('syncMsg').textContent = '請先選擇一個 .md / .csv / .json 檔案';
-    return;
-  }
-  $('syncMsg').textContent = '匯入檔案中...';
+  if (!file) { $('syncMsg').textContent = '請先選擇 .csv 或 .json 檔'; return; }
   try {
-    const deckCsv = await file.text();
-    const res = await api('/api/admin/upload-csv', 'POST', { deckCsv, sourceLabel: `本機檔案 (${file.name})` });
+    const res = await api('/api/admin/upload-csv', 'POST', { deckCsv: await file.text(), sourceLabel: `本機檔案 (${file.name})` });
     state = res.state;
-    $('syncMsg').textContent = `✓ 已從 ${file.name} 匯入 ${res.count} 頁`;
+    $('syncMsg').textContent = `✓ 已匯入 ${res.count} 頁`;
     render();
-  } catch (e) {
-    $('syncMsg').textContent = `✕ 匯入失敗：${e.message}`;
-  }
+  } catch (e) { $('syncMsg').textContent = `✕ 匯入失敗：${e.message}`; }
 };
 
-const NLM_PROMPT = `請根據我上傳的講綱與資料，為我生成一份「互動式講座簡報腳本」，輸出格式請嚴格使用以下 Markdown 分頁語法（不要輸出多餘開場白，方便我直接匯出至 Google 文件或存成 .md 放入 Google Drive）：
+const NLM_CSV_PROMPT = `請根據我上傳的講綱與資料，為我規劃一場互動式講座腳本，直接輸出標準 RFC 4180 CSV 格式（方便我直接貼入 Google 試算表使用）。
+第一列標題必須嚴格為：
+order,mode,layout,title,subtitle,body,media_url,image_prompt,opt_1,opt_2,opt_3,opt_4,correct_opt,explanation,timer_sec,speaker_note
 
----
-event_title: 講座主標題
-event_subtitle: 副標題或研習單位
-primary_color: "#6366f1"
-bg_theme: DARK_NEBULA
----
+規則：
+1. 講述頁 (mode=SLIDE)：layout 可選 COVER、QUOTE（body 用 | 分隔原文與翻譯）、BULLETS（body 用 | 分隔 3~4 點）、SPLIT（body 用 :: 分隔左右兩欄）、CARDS、CHART、DIAGRAM。
+2. 插圖規劃：請在 COVER、BULLETS、QUOTE 頁的 image_prompt 欄位，寫一句具體的「扁平向量/科技插畫畫面描述」（例如：老師在星空下輕鬆喝咖啡、AI 自動整理檔案），系統後台會自動幫我把這些畫面畫出來！
+3. 互動頁：依講綱節奏穿插 4~6 題 QUADRANT、BUBBLE、MYTH（需填 correct_opt 如 opt_2、explanation 與 timer_sec=15）、SPECTRUM、TREE、DANMAKU。
+4. 每一列都要填寫 speaker_note（40 字以內口語提詞）。含逗號或換行之欄位請用雙引號包住。`;
 
-每一頁用 --- 分隔，格式如下：
-1. 講述頁（mode: SLIDE）依內容性質選用最合適的 layout：
-   - layout: COVER（第 1 頁封面，可加 body 掃碼引導）
-   - layout: QUOTE（金句名言，body 用 | 分隔原文與中文翻譯）
-   - layout: BULLETS（3~4 點重點，每點一行 - ）
-   - layout: SPLIT（左右對比，body 用 :: 分隔左右欄）
-   - layout: DIAGRAM（遇到流程、架構、步驟、心智圖時務必用此版型，附上 \`\`\`mermaid 語法，節點文字請用雙引號包住）
-   - layout: CHART（遇到數據、時間比較、佔比時務必用此版型，寫 type: bar|pie|line|radar、unit: 單位，以及 項目: 數值）
-   - layout: CARDS（適合 3~4 階段進化史或步驟卡片，寫 flow: true 與每張卡一行 - 標籤 | 標題 | 說明）
-
-2. 互動頁（穿插 5~6 頁，緊扣聽眾痛點）：
-   - mode: QUADRANT（二維座標，opt_1 為 X 軸、opt_2 為 Y 軸）
-   - mode: BUBBLE（單選氣泡，opt_1 ~ opt_4）
-   - mode: MYTH（限時迷思搶答，opt_1 ~ opt_4、correct_opt、explanation、timer_sec: 15）
-   - mode: SPECTRUM（雙向天平，opt_1 與 opt_2）
-   - mode: TREE（結尾願景共育）
-   - mode: DANMAKU（Q&A 彈幕，opt_1 ~ opt_3 為分類標籤）
-
-3. 每頁最後都要附上一行：
-> speaker_note: 給講者的 40 字內口語提詞`;
-
-$('nlmPromptText').value = NLM_PROMPT;
-$('promptBtn').onclick = () => {
-  $('nlmCopyTip').textContent = '';
-  $('promptModal').style.display = 'flex';
-};
+$('nlmPromptText').value = NLM_CSV_PROMPT;
+$('promptBtn').onclick = () => { $('nlmCopyTip').textContent = ''; $('promptModal').classList.add('show'); };
 $('copyNlmPromptBtn').onclick = async () => {
-  await navigator.clipboard?.writeText(NLM_PROMPT);
-  $('nlmCopyTip').textContent = '✓ 已複製！直接貼進 NotebookLM 即可';
+  await navigator.clipboard?.writeText(NLM_CSV_PROMPT);
+  $('nlmCopyTip').textContent = '✓ 已複製！貼進 NotebookLM 後產出表格貼入 Google Sheets 即可';
 };
 
 function render() {
   if (!state) return;
   $('roomBadge').textContent = `Room: ${state.roomId}`;
-  const sb = $('storageBadge');
-  if (state.storageKind === 'redis') {
-    sb.className = 'tag ok';
-    sb.textContent = 'Upstash Redis 高併發就緒';
-  } else if (state.isVercel) {
-    sb.className = 'tag warn';
-    sb.textContent = '⚠ Serverless 暫存模式（建議綁定 Upstash Redis）';
-  } else {
-    sb.className = 'tag ok';
-    sb.textContent = 'Memory + SSE 即時模式';
-  }
+  updateGeminiBadge();
 
-  $('sourceInfo').textContent = `活動：${state.config?.event_title || ''} ｜ 腳本來源：${state.deckSource || '內建範本'}（共 ${state.total || 0} 頁）`;
-  if (state.deckUrl) {
-    const share = `${location.origin}/?room=${encodeURIComponent(roomId)}&sheet=${encodeURIComponent(state.deckUrl)}`;
-    $('shareUrlPreview').innerHTML = `大螢幕帶參數連結：<a href="${esc(share)}" target="_blank">開啟 ?sheet=...</a>`;
-  } else {
-    $('shareUrlPreview').textContent = '';
-  }
+  const sb = $('storageBadge');
+  if (state.storageKind === 'redis') { sb.className = 'tag ok'; sb.textContent = 'Upstash Redis 高併發'; }
+  else if (state.isVercel) { sb.className = 'tag warn'; sb.textContent = '⚠ Serverless 暫存'; }
+  else { sb.className = 'tag ok'; sb.textContent = 'Memory + SSE'; }
+
+  const bb = $('blobBadge');
+  if (hasBlobStorage) { bb.className = 'tag ok'; bb.textContent = 'Vercel Blob 圖床就緒'; }
+  else { bb.className = 'tag'; bb.textContent = '本機圖片儲存'; }
+
+  $('sourceInfo').textContent = `活動：${state.config?.event_title || ''} ｜ 來源：${state.deckSource || '內建範本'}（共 ${state.total || 0} 頁）`;
+  $('shareUrlPreview').innerHTML = state.deckUrl
+    ? `帶參數網址：<a href="${esc(`${location.origin}/?room=${encodeURIComponent(roomId)}&sheet=${encodeURIComponent(state.deckUrl)}`)}" target="_blank">開啟 ?sheet=...</a>`
+    : '';
 
   $('liveCount').textContent = `已參與 ${state.stats?.totalVotes || 0} 人`;
   $('curSlideMeta').textContent = `#${state.order} · ${state.mode}${state.layout ? ' (' + state.layout + ')' : ''} · ${state.phase}`;
   $('curInfo').textContent = `[${state.idx + 1}/${state.total}] ${state.title}${state.mode === 'SLIDE' && state.layout === 'BULLETS' ? `（漸進步驟 ${state.subStep}/${state.bullets?.length || 0}）` : ''}`;
-
   $('speakerNoteText').textContent = state.speakerNote || '（本頁未填寫講者備忘錄 speaker_note）';
   $('nextSlidePreview').textContent = state.nextSlide
     ? `下一頁預告：#${state.nextSlide.order} [${state.nextSlide.mode}${state.nextSlide.layout ? '/' + state.nextSlide.layout : ''}] ${state.nextSlide.title}`
     : '下一頁預告：已達最後一頁';
 
-  $('deckList').innerHTML = (state.deckList || []).map(item => `
-    <div class="q-item ${item.index === state.idx ? 'active' : ''}" data-idx="${item.index}">
-      <div>
-        <span class="tag">${esc(item.mode)}</span>
-        ${item.layout ? `<span class="tag">${esc(item.layout)}</span>` : ''}
-        <span style="margin-left:4px">${esc(item.title)}</span>
+  const list = state.deckList || [];
+  $('deckList').innerHTML = list.map((item, idx) => `
+    <div class="q-item ${item.index === state.idx ? 'active' : ''}">
+      <div class="q-main" onclick="ctrl('goto',{index:${item.index}})">
+        ${item.mediaUrl ? `<img class="q-thumb" src="${esc(item.mediaUrl)}" alt="">` : ''}
+        <div style="min-width:0;flex:1">
+          <div style="margin-bottom:3px">
+            <span class="tag">#${item.order}</span>
+            <span class="tag">${esc(item.mode)}</span>
+            ${item.layout ? `<span class="tag">${esc(item.layout)}</span>` : ''}
+          </div>
+          <div class="q-title">${esc(item.title)}</div>
+        </div>
       </div>
-      <span class="muted">#${item.order}</span>
+      <div class="row" style="gap:4px;flex-shrink:0">
+        <button class="ghost xs" title="上移" onclick="moveSlide(${idx},-1)" ${idx === 0 ? 'disabled' : ''}>⬆</button>
+        <button class="ghost xs" title="下移" onclick="moveSlide(${idx},1)" ${idx === list.length - 1 ? 'disabled' : ''}>⬇</button>
+        <button class="ghost xs" title="編輯與配圖" onclick="openEditor({replaceIndex:${idx}})">✏️</button>
+        <button class="sky xs" title="在此頁後方插入互動題" onclick="openEditor({afterIndex:${idx},presetMode:'BUBBLE'})">➕題</button>
+        <button class="ghost xs" title="刪除" onclick="deleteSlide(${idx})" ${list.length <= 1 ? 'disabled' : ''}>🗑</button>
+      </div>
     </div>
   `).join('');
-  document.querySelectorAll('.q-item').forEach(el => {
-    el.onclick = () => ctrl('goto', { index: Number(el.dataset.idx) });
-  });
 
   const msgs = state.allMessages || [];
   const spotId = state.stats?.spotlightId;
@@ -426,13 +910,10 @@ function render() {
     ? '<p class="muted">目前尚無彈幕留言</p>'
     : msgs.map(m => `
       <div class="msg-item ${spotId === m.id ? 'spot' : ''} ${m.hidden ? 'hid' : ''}">
-        <div>
-          <span class="tag">${esc(m.tag)}</span>
-          <span>${esc(m.text)}</span>
-        </div>
+        <div><span class="tag">${esc(m.tag)}</span> <span>${esc(m.text)}</span></div>
         <div class="row" style="flex-shrink:0">
-          <button onclick="ctrl('spotlight',{msgId:'${spotId === m.id ? '' : m.id}'})" class="${spotId === m.id ? 'warn' : 'primary'}" style="padding:6px 10px;font-size:12px">${spotId === m.id ? '取消聚焦' : '推上聚焦'}</button>
-          <button onclick="ctrl('hideMessage',{msgId:'${m.id}',hidden:${!m.hidden}})" class="ghost" style="padding:6px 10px;font-size:12px">${m.hidden ? '恢復' : '隱藏'}</button>
+          <button onclick="ctrl('spotlight',{msgId:'${spotId === m.id ? '' : m.id}'})" class="${spotId === m.id ? 'warn' : 'primary'} xs">${spotId === m.id ? '取消聚焦' : '推上聚焦'}</button>
+          <button onclick="ctrl('hideMessage',{msgId:'${m.id}',hidden:${!m.hidden}})" class="ghost xs">${m.hidden ? '恢復' : '隱藏'}</button>
         </div>
       </div>
     `).join('');
@@ -445,7 +926,7 @@ async function refresh() {
     render();
   } catch {}
 }
-setInterval(refresh, 1500);
+setInterval(refresh, 2000);
 </script>
 </body>
 </html>

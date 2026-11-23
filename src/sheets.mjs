@@ -293,6 +293,7 @@ function buildSlideObject({
   subtitle,
   body,
   mediaUrl,
+  imagePrompt = '',
   options,
   correctOpt,
   explanation,
@@ -350,6 +351,7 @@ function buildSlideObject({
     chartSpec: resolvedChart,
     cardsSpec: resolvedCards,
     mediaUrl: normalizeMediaUrl(mediaUrl),
+    imagePrompt: String(imagePrompt || '').trim(),
     options,
     correctOpt,
     explanation,
@@ -357,6 +359,8 @@ function buildSlideObject({
     speakerNote,
   };
 }
+
+export { buildSlideObject };
 
 /**
  * Convert parsed CSV rows into structured Deck slides and inline Config overrides.
@@ -417,6 +421,7 @@ export function rowsToDeck(rows) {
         subtitle: get(r, 'subtitle'),
         body: get(r, 'body'),
         mediaUrl: get(r, 'media_url'),
+        imagePrompt: get(r, 'image_prompt'),
         options,
         correctOpt: get(r, 'correct_opt'),
         explanation: get(r, 'explanation'),
@@ -638,6 +643,7 @@ export function parseJsonDeck(text) {
         subtitle: item.subtitle || '',
         body: item.body || '',
         mediaUrl: item.media_url || item.mediaUrl || '',
+        imagePrompt: item.image_prompt || item.imagePrompt || '',
         options,
         correctOpt: item.correct_opt || item.correctOpt || '',
         explanation: item.explanation || '',
@@ -795,9 +801,33 @@ export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '�
 
 const PRESET_LABELS = {
   default: '用 AI 改善工作流──邁向優雅的教師生活（18頁研習版）',
-  'notebooklm-showcase': 'NotebookLM × 快速生圖展示範本（Markdown + Mermaid + 圖表 + 圖卡）',
   'parent-orientation': '115 學年度新生入學說明會（淺色主題範例）',
 };
+
+function csvEscape(val) {
+  const s = String(val ?? '').replace(/\r?\n/g, '\\n');
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+export function deckToCsvText(deck = []) {
+  const cols = [
+    'order', 'mode', 'layout', 'title', 'subtitle', 'body', 'media_url', 'image_prompt',
+    'opt_1', 'opt_2', 'opt_3', 'opt_4', 'opt_5', 'correct_opt', 'explanation', 'timer_sec', 'speaker_note',
+  ];
+  const lines = [cols.join(',')];
+  for (const s of deck) {
+    const opts = {};
+    for (const o of s.options || []) opts[o.key] = o.label;
+    lines.push([
+      s.order, s.mode, s.layout || '', s.title, s.subtitle || '', s.body || '',
+      s.mediaUrl || '', s.imagePrompt || '',
+      opts.opt_1 || '', opts.opt_2 || '', opts.opt_3 || '', opts.opt_4 || '', opts.opt_5 || '',
+      s.correctOpt || '', s.explanation || '', s.timerSec || 0, s.speakerNote || '',
+    ].map(csvEscape).join(','));
+  }
+  return '\uFEFF' + lines.join('\r\n') + '\r\n';
+}
 
 export function listPresets() {
   const presets = [{ id: 'default', label: PRESET_LABELS.default }];

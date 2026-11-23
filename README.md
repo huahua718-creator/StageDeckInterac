@@ -66,24 +66,20 @@ npm run load-test
 
 ---
 
-## 四、 未來如何匯入與切換新的講題主軸（NotebookLM × Google Drive 支援）
+## 四、 未來如何打造與匯入新的講題（視覺化編排 × PDF × AI 產圖）
 
-### 方式 1：NotebookLM → Google Docs / Google Drive 雲端直抓（最推薦、免調格式）
-1. 進入 `/admin` 點選 **「✨ 複製 NotebookLM 專用提示詞」** 並貼進 NotebookLM。
-2. 將 NotebookLM 產出的 Markdown 內容 **匯出到 Google 文件**（或存成 `.md` / `.json` / `.csv` 放入 Google Drive），並設定為 **「知道連結者可檢視」**。
-3. 複製連結貼入 `/admin` 點擊 **「🔄 熱重載更新」**，系統會自動抓取並即時渲染 `DIAGRAM`（Mermaid 流程圖）、`CHART`（數據圖表）、`CARDS`（流程卡片）與六大互動題型！
+### 方式 1：直接匯入 NotebookLM / Canva / PPT 簡報 PDF（最直覺！）
+1. 在 NotebookLM（或 Canva / PowerPoint）做好視覺投影片並匯出為 **`.pdf`**（或多張圖片）。
+2. 進入 `/admin` 後台，將 PDF 直接拖曳進「**📄 匯入 NotebookLM / Canva PDF 簡報或圖片**」區塊，系統會自動切頁上傳至 **Vercel Blob 雲端圖床**並建立投影片。
+3. 在「**📑 視覺化講題編排器**」中點擊任一頁旁的 **「➕題」**，即可直接插入 `BUBBLE`、`MYTH`、`QUADRANT`、`SPECTRUM`、`TREE`、`DANMAKU` 互動題，還能上下調整順序或匯出 `.csv` 備份。
 
-### 方式 2：Google Sheets 雲端熱重載
-1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv` 匯入 Google 試算表，依需求修改 `Config` 與 `Deck`。
-2. 點選 **「檔案 → 共享 → 發布到網路」**，格式選擇 **「逗號分隔值 (.csv)」**，複製連結。
-3. 在 `/admin` 貼上連結點擊 **「🔄 熱重載更新」**，或直接使用帶參數網址開場：
-   - `https://stagedeckinterac.vercel.app/?room=場次名稱&sheet=編碼後的CSV網址`
+### 方式 2：文字簡報 ＋ Gemini AI 一鍵生插圖（左文右圖混排）
+1. 在 `/admin` 的編輯視窗內填寫 `COVER`、`BULLETS` 或 `QUOTE` 頁面（支援貼圖或填寫 `image_prompt`）。
+2. 設定 `GEMINI_API_KEY`（於 Vercel 環境變數或後台輸入）後，點擊 **「✨ 一鍵為全部缺圖簡報 AI 生圖」**（使用 `gemini-nano-banana-2.1`），大螢幕 `BULLETS` 與 `QUOTE` 會自動切換為 **左文右圖** 的雜誌級版型。
 
-### 方式 3：在 `/admin` 直接上傳本機 `.md` / `.csv` / `.json` 檔
-* 在電腦端編輯好檔案後，於 `/admin` 介面選取檔案點擊 **「📤 匯入檔案」** 即可即時同步至該房間（存入 Upstash Redis）。
-
-### 方式 4：新增內建主題範本（`data/decks/`）
-* 將 `<topic>.md` 或 `<topic>.csv` 放入 `data/decks/` 資料夾（內建 `notebooklm-showcase.md` 與 `parent-orientation.csv`），部署後即可在 `/admin` 下拉選單一鍵切換，或透過 `/?room=demo&preset=<topic>` 直接開啟。
+### 方式 3：Google Sheets 雲端試算表熱重載
+1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv`（或於 `/admin` 點「💾 匯出目前講題」）匯入 Google 試算表。
+2. 於 Google 試算表點選 **「檔案 → 共享 → 發布到網路 → 逗號分隔值 (.csv)」**，將連結貼入 `/admin` 按 **「🔄 熱重載」**，或直接開啟 `https://stagedeckinterac.vercel.app/?room=場次名稱&sheet=編碼後的CSV網址`。
 
 ---
 

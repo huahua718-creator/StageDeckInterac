@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, loadDeckPackage, sanitizeConfig } from './sheets.mjs';
+import { buildSlideObject, DEFAULT_CONFIG, loadDeckPackage, sanitizeConfig } from './sheets.mjs';
 
 const BAD_WORDS = [
   '幹你娘', '靠北', '靠腰', '白痴', '智障', '垃圾', '去死', 'fuck', 'shit', 'bitch', 'asshole',
@@ -106,6 +106,113 @@ function formatMobilePayload(session, slide, config, deckLen) {
     base.explanation = slide.explanation;
   }
   return base;
+}
+
+function toBuildArgs(item, order, rIdx) {
+  const options = Array.isArray(item.options)
+    ? item.options.filter((o) => o && o.label).map((o, i) => ({ key: o.key || `opt_${i + 1}`, label: String(o.label).trim() }))
+    : [1, 2, 3, 4, 5]
+        .filter((k) => item[`opt_${k}`])
+        .map((k) => ({ key: `opt_${k}`, label: String(item[`opt_${k}`]).trim() }));
+  return buildSlideObject({
+    order,
+    mode: item.mode || 'SLIDE',
+    layout: item.layout || '',
+    title: item.title || `第 ${order} 頁`,
+    subtitle: item.subtitle || '',
+    body: item.body || '',
+    mediaUrl: item.mediaUrl || item.media_url || '',
+    imagePrompt: item.imagePrompt || item.image_prompt || '',
+    options,
+    correctOpt: item.correctOpt || item.correct_opt || '',
+    explanation: item.explanation || '',
+    timerSec: Math.max(0, Number.parseInt(item.timerSec ?? item.timer_sec, 10) || 0),
+    speakerNote: item.speakerNote || item.speaker_note || '',
+    diagramCode: item.diagramCode || '',
+    rIdx,
+  });
+}
+
+function mutateDeckArray(currentDeck, opPayload) {
+  const next = currentDeck.slice();
+  const { op } = opPayload;
+
+  if (op === 'upsert') {
+    const { afterIndex, replaceIndex, slideData } = opPayload;
+    if (replaceIndex !== undefined && replaceIndex !== null && replaceIndex >= 0 && replaceIndex < next.length) {
+      const old = next[replaceIndex];
+      const built = toBuildArgs(slideData, replaceIndex + 1, replaceIndex + 1);
+      if (old.mode === built.mode) built.id = old.id;
+      next[replaceIndex] = built;
+    } else {
+      const insertAt =
+        afterIndex !== undefined && afterIndex !== null && afterIndex >= -1 && afterIndex < next.length
+          ? afterIndex + 1
+          : next.length;
+      const built = toBuildArgs(slideData, insertAt + 1, Date.now() % 100000);
+      next.splice(insertAt, 0, built);
+    }
+  } else if (op === 'move') {
+    const idx = Number(opPayload.index);
+    const dir = Number(opPayload.direction) < 0 ? -1 : 1;
+    const target = idx + dir;
+    if (idx >= 0 && idx < next.length && target >= 0 && target < next.length) {
+      [next[idx], next[target]] = [next[target], next[idx]];
+    }
+  } else if (op === 'delete') {
+    const idx = Number(opPayload.index);
+    if (next.length > 1 && idx >= 0 && idx < next.length) {
+      next.splice(idx, 1);
+    }
+  } else if (op === 'batchSlides') {
+    const incoming = (opPayload.slides || []).map((s, i) => toBuildArgs(s, i + 1, Date.now() % 10000 + i));
+    if (incoming.length === 0) throw new Error('沒有可匯入的頁面');
+    if (opPayload.append) {
+      next.push(...incoming);
+    } else {
+      next.splice(0, next.length, ...incoming);
+    }
+  } else if (op === 'setSlideMedia') {
+    const idx = Number(opPayload.index);
+    if (idx >= 0 && idx < next.length) {
+      const cur = next[idx];
+      next[idx] = toBuildArgs(
+        {
+          ...cur,
+          mediaUrl: opPayload.mediaUrl !== undefined ? opPayload.mediaUrl : cur.mediaUrl,
+          imagePrompt: opPayload.imagePrompt !== undefined ? opPayload.imagePrompt : cur.imagePrompt,
+        },
+        idx + 1,
+        idx + 1
+      );
+      next[idx].id = cur.id;
+    }
+  } else {
+    throw new Error('不支援的編排操作');
+  }
+
+  return next.map((s, i) => ({ ...s, order: i + 1 }));
+}
+
+function mapAdminDeckList(deck) {
+  return deck.map((s, index) => ({
+    index,
+    id: s.id,
+    order: s.order,
+    mode: s.mode,
+    layout: s.layout,
+    title: s.title,
+    subtitle: s.subtitle,
+    body: s.body,
+    mediaUrl: s.mediaUrl,
+    imagePrompt: s.imagePrompt || '',
+    options: s.options || [],
+    correctOpt: s.correctOpt || '',
+    explanation: s.explanation || '',
+    timerSec: s.timerSec,
+    bulletsCount: getSlideMaxSubSteps(s),
+    speakerNote: s.speakerNote,
+  }));
 }
 
 /**
@@ -606,19 +713,45 @@ export class MemoryRoomStore {
             title: nextSlide.title,
           }
         : null,
-      deckList: room.deck.map((s, index) => ({
-        index,
-        id: s.id,
-        order: s.order,
-        mode: s.mode,
-        layout: s.layout,
-        title: s.title,
-        timerSec: s.timerSec,
-        bulletsCount: getSlideMaxSubSteps(s),
-        speakerNote: s.speakerNote,
-      })),
+      deckList: mapAdminDeckList(room.deck),
       allMessages: b ? b.messages.slice().reverse() : [],
     };
+  }
+
+  async mutateDeck(roomId, opPayload) {
+    const room = this._ensureRoom(roomId);
+    const updatedDeck = mutateDeckArray(room.deck, opPayload);
+    const prevIdx = room.session.currentIndex;
+    room.deck = updatedDeck;
+    room.explicitSheetLock = true;
+    if (opPayload.op === 'batchSlides' && !opPayload.append) {
+      room.source = opPayload.sourceLabel || 'PDF / 圖片簡報匯入';
+      room.session.currentIndex = 0;
+      room.session.subStep = 0;
+      room.session.phase = getInitialPhaseForSlide(updatedDeck[0]);
+    } else if (opPayload.op === 'upsert' && opPayload.jumpToNew && opPayload.replaceIndex === undefined) {
+      const targetIdx = Math.min(updatedDeck.length - 1, Math.max(0, (opPayload.afterIndex ?? prevIdx) + 1));
+      this._activateSlide(room, targetIdx);
+      return room;
+    } else if (room.session.currentIndex >= updatedDeck.length) {
+      room.session.currentIndex = updatedDeck.length - 1;
+      room.session.subStep = 0;
+    }
+    for (const s of updatedDeck) {
+      if (!room.responses.has(s.order)) room.responses.set(s.order, createResponseBucket(s));
+    }
+    room.session.version++;
+    this._notify(room.roomId, 'deck');
+    return room;
+  }
+
+  async updateConfig(roomId, partialConfig) {
+    const room = this._ensureRoom(roomId);
+    room.config = sanitizeConfig({ ...room.config, ...partialConfig });
+    room.explicitSheetLock = true;
+    room.session.version++;
+    this._notify(room.roomId, 'deck');
+    return room;
   }
 }
 
@@ -1305,19 +1438,55 @@ export class UpstashRedisRoomStore {
             title: nextSlide.title,
           }
         : null,
-      deckList: state.pkg.deck.map((s, index) => ({
-        index,
-        id: s.id,
-        order: s.order,
-        mode: s.mode,
-        layout: s.layout,
-        title: s.title,
-        timerSec: s.timerSec,
-        bulletsCount: getSlideMaxSubSteps(s),
-        speakerNote: s.speakerNote,
-      })),
+      deckList: mapAdminDeckList(state.pkg.deck),
       allMessages,
     };
+  }
+
+  async mutateDeck(roomId, opPayload) {
+    const state = await this._loadRoom(roomId);
+    const k = this._keys(roomId);
+    const updatedDeck = mutateDeckArray(state.pkg.deck, opPayload);
+    state.pkg.deck = updatedDeck;
+    state.pkg.explicitSheetLock = true;
+
+    if (opPayload.op === 'batchSlides' && !opPayload.append) {
+      state.pkg.source = opPayload.sourceLabel || 'PDF / 圖片簡報匯入';
+      state.session.currentIndex = 0;
+      state.session.subStep = 0;
+      state.session.phase = getInitialPhaseForSlide(updatedDeck[0]);
+      state.session.timerEndsAt = 0;
+    } else if (opPayload.op === 'upsert' && opPayload.jumpToNew && opPayload.replaceIndex === undefined) {
+      const targetIdx = Math.min(updatedDeck.length - 1, Math.max(0, (opPayload.afterIndex ?? state.session.currentIndex) + 1));
+      const slide = updatedDeck[targetIdx];
+      state.session.currentIndex = targetIdx;
+      state.session.subStep = 0;
+      state.session.phase = getInitialPhaseForSlide(slide);
+      state.session.timerEndsAt = 0;
+    } else if (state.session.currentIndex >= updatedDeck.length) {
+      state.session.currentIndex = updatedDeck.length - 1;
+      state.session.subStep = 0;
+    }
+
+    state.session.version = (state.session.version || 1) + 1;
+    await this._pipeline([
+      ['SET', k.pkg, JSON.stringify(state.pkg), 'EX', this.roomTtlSec],
+      ['SET', k.session, JSON.stringify(state.session), 'EX', this.roomTtlSec],
+    ]);
+    return state;
+  }
+
+  async updateConfig(roomId, partialConfig) {
+    const state = await this._loadRoom(roomId);
+    const k = this._keys(roomId);
+    state.pkg.config = sanitizeConfig({ ...state.pkg.config, ...partialConfig });
+    state.pkg.explicitSheetLock = true;
+    state.session.version = (state.session.version || 1) + 1;
+    await this._pipeline([
+      ['SET', k.pkg, JSON.stringify(state.pkg), 'EX', this.roomTtlSec],
+      ['SET', k.session, JSON.stringify(state.session), 'EX', this.roomTtlSec],
+    ]);
+    return state;
   }
 }
 
