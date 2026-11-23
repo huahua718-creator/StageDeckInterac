@@ -7,11 +7,10 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.mjs" },
-    { "source": "/m", "destination": "/public/mobile.html" },
-    { "source": "/admin", "destination": "/public/admin.html" },
-    { "source": "/remote", "destination": "/public/remote.html" },
-    { "source": "/assets/(.*)", "destination": "/public/assets/$1" },
-    { "source": "/", "destination": "/public/index.html" }
+    { "source": "/m", "destination": "/mobile.html" },
+    { "source": "/admin", "destination": "/admin.html" },
+    { "source": "/remote", "destination": "/remote.html" },
+    { "source": "/", "destination": "/index.html" }
   ],
   "headers": [
     {
