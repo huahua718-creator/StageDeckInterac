@@ -187,6 +187,23 @@ function mutateDeckArray(currentDeck, opPayload) {
       );
       next[idx].id = cur.id;
     }
+  } else if (op === 'batchSlideMedia') {
+    for (const u of opPayload.updates || []) {
+      const idx = Number(u.index);
+      if (idx >= 0 && idx < next.length) {
+        const cur = next[idx];
+        next[idx] = toBuildArgs(
+          {
+            ...cur,
+            mediaUrl: u.mediaUrl !== undefined ? u.mediaUrl : cur.mediaUrl,
+            imagePrompt: u.imagePrompt !== undefined ? u.imagePrompt : cur.imagePrompt,
+          },
+          idx + 1,
+          idx + 1
+        );
+        next[idx].id = cur.id;
+      }
+    }
   } else {
     throw new Error('不支援的編排操作');
   }

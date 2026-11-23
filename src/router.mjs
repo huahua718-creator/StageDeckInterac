@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
 import { deckToCsvText, listPresets, loadDeckFromCsvTexts, loadDeckPackage, loadPreset } from './sheets.mjs';
 import { createRoomStore, sanitizeRoomId } from './store.mjs';
-import { generateSlideIllustration, saveDataUrlImage } from './media.mjs';
+import { generateBatchImagePrompts, generateSlideIllustration, saveDataUrlImage } from './media.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT_DIR = path.resolve(__dirname, '..');
@@ -508,7 +508,26 @@ export async function createAppContext() {
         return sendJson(res, 200, { ok: true, url: saved.url, storage: saved.storage });
       }
 
-      // Admin AI Generate Illustration (Gemini Nano Banana 2.1 -> Vercel Blob)
+      // Admin Batch Visual Metaphor Prompt Generator (fast text model)
+      if (req.method === 'POST' && pathname === '/api/admin/generate-prompts') {
+        const body = await readJsonBody(req);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const targetRoom = sanitizeRoomId(body.roomId || roomId);
+        const curState = await store.getAdminState(targetRoom);
+        const apiKey = req.headers['x-gemini-api-key'] || body.geminiApiKey || '';
+        const prompts = await generateBatchImagePrompts({
+          apiKey,
+          slides: body.slides || [],
+          styleLabel: body.styleLabel || '現代扁平向量插畫',
+          bgTheme: curState.config?.bg_theme || 'DARK_NEBULA',
+          primaryColor: curState.config?.primary_color || '#6366f1',
+        });
+        return sendJson(res, 200, { ok: true, prompts });
+      }
+
+      // Admin AI Generate Illustration (Gemini Nano Banana 2.1 -> SVG fallback -> Vercel Blob)
       if (req.method === 'POST' && pathname === '/api/admin/generate-image') {
         const body = await readJsonBody(req);
         if (!isAuthorized(req, body)) {

@@ -151,6 +151,7 @@ export async function generateSlideIllustration({
     const svgInteraction = await ai.interactions.create({
       model: 'gemini-4-hydrogen',
       input: svgPrompt,
+      generation_config: { thinking_level: 'low' },
     });
     const svgText = sanitizeSvgMarkup(svgInteraction?.output_text || '');
     if (svgText) {
@@ -166,4 +167,44 @@ export async function generateSlideIllustration({
   }
 
   throw new Error(lastErr?.message || 'Gemini 未回傳圖片內容，請調整描述後再試');
+}
+
+/**
+ * Use fast text model (gemini-3.5-flash-lite) to turn dry slide titles/bullets into
+ * vivid visual metaphor prompts for external AI image generators.
+ */
+export async function generateBatchImagePrompts({
+  apiKey,
+  slides = [],
+  styleLabel = '現代扁平向量插畫',
+  bgTheme = 'DARK_NEBULA',
+  primaryColor = '#6366f1',
+}) {
+  const resolvedKey = String(apiKey || process.env.GEMINI_API_KEY || '').trim();
+  if (!resolvedKey) {
+    throw new Error('尚未設定 GEMINI_API_KEY，將直接使用投影片標題組成提示詞');
+  }
+  if (!slides.length) return [];
+
+  const listText = slides
+    .map((s) => `order=${s.order} | layout=${s.layout} | title=${s.title} | subtitle=${s.subtitle || ''} | body=${String(s.body || '').slice(0, 120)}`)
+    .join('\n');
+
+  const prompt =
+    `你是一位簡報視覺總監。請為以下簡報頁面各構思一句「具體、有畫面感的視覺隱喻插圖描述」（繁體中文，每句 25~45 字，不要包含圖中文字或條列）。\n` +
+    `整體風格：${styleLabel}，背景氛圍：${bgTheme}，主色票：${primaryColor}。\n` +
+    `請嚴格只回傳 JSON 陣列（不要 Markdown 圍欄），格式：[{"order":1,"prompt":"..."}]\n\n` +
+    `投影片清單：\n${listText}`;
+
+  const ai = new GoogleGenAI({ apiKey: resolvedKey });
+  const res = await ai.interactions.create({
+    model: 'gemini-3.5-flash-lite',
+    input: prompt,
+  });
+
+  const text = String(res?.output_text || '').trim();
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error('無法解析 AI 回傳的提示詞 JSON');
+  const parsed = JSON.parse(jsonMatch[0]);
+  return Array.isArray(parsed) ? parsed : [];
 }

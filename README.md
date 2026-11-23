@@ -73,9 +73,10 @@ npm run load-test
 2. 進入 `/admin` 後台，將 PDF 直接拖曳進「**📄 匯入 NotebookLM / Canva PDF 簡報或圖片**」區塊，系統會自動切頁上傳至 **Vercel Blob 雲端圖床**並建立投影片。
 3. 在「**📑 視覺化講題編排器**」中點擊任一頁旁的 **「➕題」**，即可直接插入 `BUBBLE`、`MYTH`、`QUADRANT`、`SPECTRUM`、`TREE`、`DANMAKU` 互動題，還能上下調整順序或匯出 `.csv` 備份。
 
-### 方式 2：文字簡報 ＋ Gemini AI 一鍵生插圖（左文右圖混排）
-1. 在 `/admin` 的編輯視窗內填寫 `COVER`、`BULLETS` 或 `QUOTE` 頁面（支援貼圖或填寫 `image_prompt`）。
-2. 設定 `GEMINI_API_KEY`（於 Vercel 環境變數或後台輸入）後，點擊 **「✨ 一鍵為全部缺圖簡報 AI 生圖」**（使用 `gemini-nano-banana-2.1`），大螢幕 `BULLETS` 與 `QUOTE` 會自動切換為 **左文右圖** 的雜誌級版型。
+### 方式 2：批量匯出 AI 生圖提示詞 ＋ 外部生圖後智慧對齊上傳（左文右圖混排）
+1. 在 `/admin` 的編輯視窗內填寫 `COVER`、`BULLETS` 或 `QUOTE` 頁面（也可在任一投影片列直接點 **「🖼」** 單張快速上傳圖片）。
+2. 點擊 **「📋 1. 生成批量生圖提示詞」**（或選配 **「✨ AI 構思生動畫面」**），一鍵匯出所有缺圖頁面的結構化提示詞與建議檔名（例如 `01.png`、`03.png`），貼到 Gemini / ChatGPT / Midjourney / Whisk 等視窗批量產圖並挑選喜歡的圖片。
+3. 回到後台點擊或拖曳圖片至 **「📤 2. 批量拖曳或選取生好的圖片」**，系統會依檔名頁碼或順序自動對齊缺圖投影片並預覽配對結果，確認後一次上傳至雲端並完成 **左文右圖** 混排。
 
 ### 方式 3：Google Sheets 雲端試算表熱重載
 1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv`（或於 `/admin` 點「💾 匯出目前講題」）匯入 Google 試算表。

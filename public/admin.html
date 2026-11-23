@@ -129,18 +129,36 @@ a{color:var(--sky)}
       </div>
 
       <div class="card">
-        <h3>🎨 方案二：AI 一鍵為簡報生成專屬插圖（Nano Banana 2.1）</h3>
-        <p class="muted" style="margin:0 0 10px">自動為 <code>COVER</code> / <code>BULLETS</code> / <code>QUOTE</code> 頁面補上與主題色一致的插畫（大螢幕自動切換為「左文右圖」排版）。</p>
-        <div class="row" style="margin-bottom:10px">
-          <input id="geminiKeyInput" type="password" placeholder="輸入 GEMINI_API_KEY（若 Vercel 環境變數已設可留空）">
-          <span id="geminiKeyBadge" class="tag">未設定 Key</span>
+        <h3>🎨 方案二：批量產出繪圖提示詞 → 外部 AI 挑圖 → 批配上傳</h3>
+        <p class="muted" style="margin:0 0 10px">先匯出每頁的提示詞貼給 Gemini / ChatGPT / Canva 生圖並挑選滿意的圖片，再一次拖進來依頁碼自動配對上傳！</p>
+        <div class="row" style="margin-bottom:8px">
+          <select id="artStyleSel" style="flex:1;min-width:170px">
+            <option value="現代扁平向量插畫，線條俐落、發光點綴">現代扁平向量插畫</option>
+            <option value="3D 等距微縮科技場景，柔和光影">3D 等距科技場景</option>
+            <option value="溫暖日系手繪水彩插畫，柔和療癒">溫暖日系手繪插畫</option>
+            <option value="電影感高質感攝影寫實風格">電影感寫實攝影</option>
+          </select>
+          <select id="promptScopeSel" style="max-width:165px">
+            <option value="missing">僅針對缺圖簡報頁</option>
+            <option value="all">全部 SLIDE 簡報頁</option>
+          </select>
         </div>
-        <div class="row">
-          <button id="batchAiImgBtn" class="primary">✨ 一鍵為全部缺圖簡報 AI 生圖</button>
-          <button id="themeModalBtn" class="ghost">🎨 修改標題與配色</button>
+        <div class="row" style="margin-bottom:8px">
+          <button id="genBatchPromptBtn" class="primary">📋 1. 生成批量生圖提示詞</button>
+          <button id="aiPolishPromptsBtn" class="sky">✨ AI 構思生動畫面</button>
+          <button id="themeModalBtn" class="ghost">🎨 主題配色</button>
         </div>
-        <div id="aiStatus" class="muted" style="margin-top:8px"></div>
-        <div id="aiProgressBar" class="progress-bar"><div id="aiProgressFill" class="progress-fill"></div></div>
+        <div id="batchImgDropzone" class="dropzone" style="padding:11px">
+          <div style="font-weight:800;font-size:13px">📤 2. 批量拖曳或選取生好的圖片（如 01.png, 03.png... 自動對齊頁碼）</div>
+          <input id="batchImgInput" type="file" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
+        </div>
+        <div class="row" style="margin-top:8px;justify-content:space-between">
+          <span id="aiStatus" class="muted"></span>
+          <div class="row" style="gap:6px">
+            <input id="geminiKeyInput" type="password" placeholder="選填 GEMINI_API_KEY" style="max-width:165px;padding:6px 10px;font-size:12px">
+            <span id="geminiKeyBadge" class="tag">檢查中</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -341,6 +359,41 @@ a{color:var(--sky)}
     </div>
   </div>
 </div>
+
+<!-- 批量繪圖提示詞 Modal -->
+<div id="batchPromptModal" class="modal-bg">
+  <div class="modal-card">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">📋 批量 AI 繪圖提示詞清單（可直接貼到 Gemini / ChatGPT / Whisk）</h3>
+      <button onclick="$('batchPromptModal').classList.remove('show')" class="ghost xs">關閉</button>
+    </div>
+    <p class="muted" style="margin:0 0 10px">將下方內容貼到其他 AI 視窗生成圖片，下載時建議保留頁碼（如 <code>01.png</code>、<code>03.png</code>），再拖進「2. 批量上傳配圖」即可自動對齊！</p>
+    <textarea id="batchPromptBox" rows="15" style="font-size:13px;line-height:1.55"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button id="copyBatchPromptBtn" class="primary">📋 一鍵複製全部提示詞</button>
+      <span id="batchPromptTip" class="muted"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 批量插圖配對預覽 Modal -->
+<div id="batchMatchModal" class="modal-bg">
+  <div class="modal-card" style="max-width:880px">
+    <div class="row" style="justify-content:space-between;margin-bottom:10px">
+      <h3 style="margin:0">🖼 確認批量圖片與投影片配對</h3>
+      <button onclick="$('batchMatchModal').classList.remove('show')" class="ghost xs">取消</button>
+    </div>
+    <p class="muted" style="margin:0 0 12px">系統已依檔名頁碼（或順序）自動配對，您可以微調每張圖要放進哪一頁，確認後按下「確認上傳並套用」。</p>
+    <div id="batchMatchList" style="max-height:55vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px"></div>
+    <div class="progress-bar" id="batchUpBar"><div class="progress-fill" id="batchUpFill"></div></div>
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <span id="batchUpStatus" class="muted"></span>
+      <button id="confirmBatchMatchBtn" class="primary">✅ 確認批次上傳並套用</button>
+    </div>
+  </div>
+</div>
+
+<input id="quickRowImgInput" type="file" accept="image/png,image/jpeg,image/webp" style="display:none">
 
 <!-- NotebookLM Google Sheets Prompt Modal -->
 <div id="promptModal" class="modal-bg">
@@ -598,48 +651,200 @@ async function handleSlideFiles(fileList) {
   }
 }
 
-// ---------- 方案二：AI 一鍵批次生圖 ----------
-$('batchAiImgBtn').onclick = async () => {
-  if (!hasServerGeminiKey && !geminiKey) {
-    $('aiStatus').textContent = '請先在上方輸入您的 GEMINI_API_KEY！';
-    return;
-  }
-  const targets = (state?.deckList || []).filter(
-    s => s.mode === 'SLIDE' && ['COVER', 'BULLETS', 'QUOTE'].includes(s.layout) && !s.mediaUrl
-  );
-  if (targets.length === 0) {
-    $('aiStatus').textContent = '目前所有 COVER / BULLETS / QUOTE 頁面都已有配圖了！';
-    return;
-  }
-  if (!confirm(`將為 ${targets.length} 頁尚未配圖的投影片呼叫 Gemini Nano Banana 2.1 生成插圖，確定開始？`)) return;
+// ---------- 方案二：批量繪圖提示詞 & 批量配對上傳 ----------
+let aiSuggestedMap = new Map(); // order -> vivid visual prompt
 
-  const btn = $('batchAiImgBtn');
+function getPromptTargetSlides() {
+  const scope = $('promptScopeSel').value;
+  return (state?.deckList || []).filter(s => {
+    if (s.mode !== 'SLIDE') return false;
+    if (scope === 'all') return true;
+    return !s.mediaUrl && ['COVER', 'BULLETS', 'QUOTE', 'SPLIT'].includes(s.layout);
+  });
+}
+
+function openBatchPromptModal() {
+  const targets = getPromptTargetSlides();
+  if (!targets.length) {
+    $('aiStatus').textContent = '目前沒有符合條件的簡報頁需要產圖（可切換為「全部 SLIDE」）。';
+    return;
+  }
+  const style = $('artStyleSel').value;
+  const c = state?.config || {};
+  const lines = [
+    `請幫我為以下 ${targets.length} 頁簡報各生成一張橫式（16:9 或 4:3）插圖，整體風格統一為：「${style}」，色調搭配主題色 ${c.primary_color || '#6366f1'}（背景風格：${c.bg_theme || 'DARK_NEBULA'}）。畫面保持簡潔有留白、不要出現過多文字或亂碼。`,
+    `下載圖片時請依對應頁碼命名（例如 ${targets.slice(0, 3).map(t => String(t.order).padStart(2, '0') + '.png').join('、')}），方便我直接批量配對匯入！`,
+    '',
+  ];
+  for (const s of targets) {
+    const pad = String(s.order).padStart(2, '0');
+    const vivid = aiSuggestedMap.get(s.order) || s.imagePrompt || '';
+    const summary = s.body ? `（重點：${String(s.body).replace(/\|/g, '、').slice(0, 80)}）` : '';
+    lines.push(`【第 ${s.order} 頁｜建議檔名：${pad}.png】標題：「${s.title}」${s.subtitle ? ' — ' + s.subtitle : ''}`);
+    lines.push(`  畫面描述：${vivid || `${s.title} 的視覺隱喻插圖${summary}`}`);
+    lines.push('');
+  }
+  $('batchPromptBox').value = lines.join('\n');
+  $('batchPromptTip').textContent = '';
+  $('batchPromptModal').classList.add('show');
+}
+
+$('genBatchPromptBtn').onclick = openBatchPromptModal;
+
+$('aiPolishPromptsBtn').onclick = async () => {
+  const targets = getPromptTargetSlides();
+  if (!targets.length) { $('aiStatus').textContent = '沒有需要構思的簡報頁'; return; }
+  const btn = $('aiPolishPromptsBtn');
   btn.disabled = true;
-  $('aiProgressBar').style.display = 'block';
-  let okCount = 0;
-
-  for (let i = 0; i < targets.length; i++) {
-    const s = targets[i];
-    $('aiStatus').textContent = `🎨 AI 正在繪製第 ${i + 1} / ${targets.length} 張：「${s.title}」...`;
-    try {
-      const res = await api('/api/admin/generate-image', 'POST', {
-        slideIndex: s.index,
-        prompt: s.imagePrompt || '',
-        title: s.title,
-        subtitle: s.subtitle,
-      });
-      state = res.state;
-      okCount++;
-      render();
-    } catch (e) {
-      $('aiStatus').textContent = `✕ 第 ${i + 1} 張失敗：${e.message}`;
-      break;
+  $('aiStatus').textContent = `✨ 正在用 Gemini 幫 ${targets.length} 頁構思具體畫面描述（約 2 秒）...`;
+  try {
+    const res = await api('/api/admin/generate-prompts', 'POST', {
+      slides: targets,
+      styleLabel: $('artStyleSel').value,
+    });
+    for (const p of (res.prompts || [])) {
+      if (p.order && p.prompt) aiSuggestedMap.set(Number(p.order), p.prompt);
     }
-    $('aiProgressFill').style.width = `${Math.round(((i + 1) / targets.length) * 100)}%`;
+    $('aiStatus').textContent = `✓ 已為 ${res.prompts?.length || 0} 頁構思專屬畫面描述！`;
+    openBatchPromptModal();
+  } catch (e) {
+    $('aiStatus').textContent = `⚠ AI 潤飾略過（${e.message}），已改用預設描述`;
+    openBatchPromptModal();
   }
   btn.disabled = false;
-  if (okCount === targets.length) {
-    $('aiStatus').textContent = `✓ 已成功為 ${okCount} 頁簡報生成專屬插圖！`;
+};
+
+$('copyBatchPromptBtn').onclick = async () => {
+  await navigator.clipboard?.writeText($('batchPromptBox').value);
+  $('batchPromptTip').textContent = '✓ 已複製！貼到 Gemini / ChatGPT / Whisk 生圖後下載即可';
+};
+
+// 批量圖片上傳與自動頁碼配對
+const batchDrop = $('batchImgDropzone');
+const batchIn = $('batchImgInput');
+let pendingBatchMatches = []; // [{ file, previewUrl, targetIndex }]
+
+batchDrop.onclick = () => batchIn.click();
+batchDrop.ondragover = e => { e.preventDefault(); batchDrop.style.background = 'rgba(56,189,248,.18)'; };
+batchDrop.ondragleave = () => { batchDrop.style.background = ''; };
+batchDrop.ondrop = e => {
+  e.preventDefault(); batchDrop.style.background = '';
+  if (e.dataTransfer?.files?.length) openBatchMatchModal(e.dataTransfer.files);
+};
+batchIn.onchange = () => { if (batchIn.files?.length) openBatchMatchModal(batchIn.files); batchIn.value = ''; };
+
+function openBatchMatchModal(fileList) {
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if (!files.length) { $('aiStatus').textContent = '請選擇 PNG / JPG / WebP 圖片'; return; }
+  const deck = state?.deckList || [];
+  const missingOrderIndices = deck
+    .filter(s => s.mode === 'SLIDE' && !s.mediaUrl && ['COVER', 'BULLETS', 'QUOTE', 'SPLIT', 'MEDIA'].includes(s.layout))
+    .map(s => s.index);
+  let seqCursor = 0;
+
+  // Sort filenames naturally (01.png, 02.png, 10.png)
+  files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  pendingBatchMatches = files.map(f => {
+    let targetIndex = -1;
+    const m = f.name.match(/(?:^|[^0-9])(\d{1,2})(?:[^0-9]|$)/);
+    if (m) {
+      const num = Number.parseInt(m[1], 10);
+      const found = deck.find(s => s.order === num);
+      if (found) targetIndex = found.index;
+    }
+    if (targetIndex === -1 && seqCursor < missingOrderIndices.length) {
+      targetIndex = missingOrderIndices[seqCursor++];
+    }
+    if (targetIndex === -1 && deck.length > 0) targetIndex = 0;
+    return { file: f, previewUrl: URL.createObjectURL(f), targetIndex };
+  });
+
+  const slideOptionsHtml = (selIdx) =>
+    `<option value="-1">（略過此圖）</option>` +
+    deck.map(s => `<option value="${s.index}" ${s.index === selIdx ? 'selected' : ''}>#${s.order} [${s.mode}${s.layout ? '/' + s.layout : ''}] ${esc(s.title)}</option>`).join('');
+
+  $('batchMatchList').innerHTML = pendingBatchMatches.map((item, i) => `
+    <div class="q-item" style="margin:0">
+      <img src="${item.previewUrl}" style="width:96px;height:56px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;color:var(--muted);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">檔名：${esc(item.file.name)}</div>
+        <select data-match-idx="${i}" style="width:100%">${slideOptionsHtml(item.targetIndex)}</select>
+      </div>
+    </div>
+  `).join('');
+
+  $('batchMatchList').querySelectorAll('select[data-match-idx]').forEach(sel => {
+    sel.onchange = () => {
+      pendingBatchMatches[Number(sel.dataset.matchIdx)].targetIndex = Number(sel.value);
+    };
+  });
+  $('batchUpBar').style.display = 'none';
+  $('batchUpStatus').textContent = `共選取 ${pendingBatchMatches.length} 張圖片`;
+  $('confirmBatchMatchBtn').disabled = false;
+  $('batchMatchModal').classList.add('show');
+}
+
+$('confirmBatchMatchBtn').onclick = async () => {
+  const valid = pendingBatchMatches.filter(m => m.targetIndex >= 0);
+  if (!valid.length) { $('batchMatchModal').classList.remove('show'); return; }
+  const btn = $('confirmBatchMatchBtn');
+  btn.disabled = true;
+  $('batchUpBar').style.display = 'block';
+  $('batchUpFill').style.width = '0%';
+
+  try {
+    const updates = [];
+    for (let i = 0; i < valid.length; i++) {
+      const m = valid[i];
+      $('batchUpStatus').textContent = `正在上傳第 ${i + 1} / ${valid.length} 張...`;
+      const dataUrl = await fileToCompressedDataUrl(m.file);
+      const up = await api('/api/admin/upload-media', 'POST', { dataUrl, filenamePrefix: `s${m.targetIndex + 1}` });
+      const slideOrder = state?.deckList?.[m.targetIndex]?.order;
+      updates.push({
+        index: m.targetIndex,
+        mediaUrl: up.url,
+        imagePrompt: aiSuggestedMap.get(slideOrder) || undefined,
+      });
+      $('batchUpFill').style.width = `${Math.round(((i + 1) / valid.length) * 100)}%`;
+    }
+    const res = await api('/api/admin/deck-edit', 'POST', { op: 'batchSlideMedia', updates });
+    state = res.state;
+    pendingBatchMatches.forEach(m => URL.revokeObjectURL(m.previewUrl));
+    $('batchMatchModal').classList.remove('show');
+    $('aiStatus').textContent = `✓ 已成功批配並套用 ${updates.length} 張投影片插圖！`;
+    render();
+  } catch (e) {
+    $('batchUpStatus').textContent = `✕ 上傳失敗：${e.message}`;
+    btn.disabled = false;
+  }
+};
+
+// 單頁 1-Click 快速配圖上傳
+let quickTargetSlideIdx = null;
+function quickUploadSlideImg(idx) {
+  quickTargetSlideIdx = idx;
+  $('quickRowImgInput').click();
+}
+$('quickRowImgInput').onchange = async () => {
+  const f = $('quickRowImgInput').files?.[0];
+  $('quickRowImgInput').value = '';
+  if (!f || quickTargetSlideIdx === null) return;
+  const idx = quickTargetSlideIdx;
+  $('aiStatus').textContent = `正在為第 ${idx + 1} 頁上傳插圖...`;
+  try {
+    const dataUrl = await fileToCompressedDataUrl(f);
+    const up = await api('/api/admin/upload-media', 'POST', { dataUrl, filenamePrefix: `p${idx + 1}` });
+    const res = await api('/api/admin/deck-edit', 'POST', {
+      op: 'setSlideMedia',
+      index: idx,
+      mediaUrl: up.url,
+    });
+    state = res.state;
+    $('aiStatus').textContent = `✓ 第 ${idx + 1} 頁插圖已更新！`;
+    render();
+  } catch (e) {
+    $('aiStatus').textContent = `✕ 上傳失敗：${e.message}`;
   }
 };
 
@@ -897,7 +1102,8 @@ function render() {
       <div class="row" style="gap:4px;flex-shrink:0">
         <button class="ghost xs" title="上移" onclick="moveSlide(${idx},-1)" ${idx === 0 ? 'disabled' : ''}>⬆</button>
         <button class="ghost xs" title="下移" onclick="moveSlide(${idx},1)" ${idx === list.length - 1 ? 'disabled' : ''}>⬇</button>
-        <button class="ghost xs" title="編輯與配圖" onclick="openEditor({replaceIndex:${idx}})">✏️</button>
+        ${item.mode === 'SLIDE' ? `<button class="ghost xs" title="一鍵上傳此頁插圖" onclick="quickUploadSlideImg(${idx})">🖼</button>` : ''}
+        <button class="ghost xs" title="編輯內容與配圖" onclick="openEditor({replaceIndex:${idx}})">✏️</button>
         <button class="sky xs" title="在此頁後方插入互動題" onclick="openEditor({afterIndex:${idx},presetMode:'BUBBLE'})">➕題</button>
         <button class="ghost xs" title="刪除" onclick="deleteSlide(${idx})" ${list.length <= 1 ? 'disabled' : ''}>🗑</button>
       </div>

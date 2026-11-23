@@ -267,6 +267,19 @@ async function runTests() {
     assert.equal(expRes.status, 200);
     assert.ok((await expRes.text()).includes('Inserted Poll'));
 
+    const batchMediaRes = await fetch(`${base}/api/admin/deck-edit?room=editorroom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({
+        roomId: 'editorroom',
+        op: 'batchSlideMedia',
+        updates: [{ index: 0, mediaUrl: '/assets/workflow-diagram.svg', imagePrompt: 'test prompt' }],
+      }),
+    });
+    assert.equal(batchMediaRes.status, 200);
+    const bmJson = await batchMediaRes.json();
+    assert.equal(bmJson.state.deckList[0].mediaUrl, '/assets/workflow-diagram.svg');
+
     // Verify Vercel serverless entrypoint works cleanly
     const mockServer = http.createServer((req, res) => vercelHandler(req, res));
     await new Promise((resolve) => mockServer.listen(0, '127.0.0.1', resolve));
