@@ -8,9 +8,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.resolve(__dirname, '../public/uploads');
 
 const THEME_ART_HINTS = {
-  DARK_NEBULA: 'deep midnight cosmic indigo background, luminous glowing accents, clean modern editorial vector illustration',
-  CLEAN_LIGHT: 'clean soft ivory and light slate background, crisp minimalist editorial vector illustration, bright airy daylight feel',
-  TECH_GRID: 'dark obsidian tech grid backdrop, cyan and indigo glowing futuristic line art, modern clean vector illustration',
+  DARK_NEBULA: 'deep midnight cosmic indigo background (#0b132b to #1e1b4b), luminous glowing accents, clean modern editorial vector illustration',
+  CLEAN_LIGHT: 'clean soft ivory and light slate background (#f8fafc to #e2e8f0), crisp minimalist editorial vector illustration, bright airy daylight feel',
+  TECH_GRID: 'dark obsidian tech grid backdrop (#030712 to #0b192e), cyan and indigo glowing futuristic line art, modern clean vector illustration',
 };
 
 /**
@@ -18,11 +18,13 @@ const THEME_ART_HINTS = {
  * or to local public/uploads/ for local Node development.
  */
 export async function saveImageBuffer({ buffer, contentType = 'image/png', filenamePrefix = 'slide' }) {
-  const ext = contentType.includes('webp')
-    ? 'webp'
-    : contentType.includes('jpeg') || contentType.includes('jpg')
-      ? 'jpg'
-      : 'png';
+  const ext = contentType.includes('svg')
+    ? 'svg'
+    : contentType.includes('webp')
+      ? 'webp'
+      : contentType.includes('jpeg') || contentType.includes('jpg')
+        ? 'jpg'
+        : 'png';
   const safePrefix = String(filenamePrefix || 'slide').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 24) || 'slide';
   const uniqueName = `sdi/${safePrefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
 
@@ -57,9 +59,40 @@ export async function saveDataUrlImage({ dataUrl, filenamePrefix = 'upload' }) {
   return saveImageBuffer({ buffer, contentType, filenamePrefix });
 }
 
+function extractImageFromInteraction(interaction) {
+  let imgData = interaction?.output_image?.data || '';
+  let mimeType = interaction?.output_image?.mime_type || 'image/png';
+  if (!imgData && Array.isArray(interaction?.steps)) {
+    for (const step of interaction.steps) {
+      for (const item of step?.content || []) {
+        if (item?.type === 'image' && item?.data) {
+          imgData = item.data;
+          mimeType = item.mime_type || 'image/png';
+        }
+      }
+    }
+  }
+  return imgData ? { imgData, mimeType } : null;
+}
+
+function sanitizeSvgMarkup(rawText) {
+  const match = String(rawText || '').match(/<svg[\s\S]*?<\/svg>/i);
+  if (!match) return '';
+  let svg = match[0]
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  if (!/\bxmlns=/.test(svg)) {
+    svg = svg.replace(/^<svg\b/i, '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+  return svg;
+}
+
 /**
- * Generate a presentation slide illustration using Gemini Nano Banana 2.1 (`gemini-nano-banana-2.1`)
- * via the official @google/genai Interactions API, and store it in Vercel Blob / local uploads.
+ * Generate a presentation slide illustration:
+ * 1) Tries Nano Banana image models (`gemini-nano-banana-2.1`, `gemini-3.1-flash-lite-image`)
+ * 2) If the API key is on Free Tier (limit: 0 for raster image models), falls back seamlessly
+ *    to `gemini-4-hydrogen` to craft a high-craft custom vector SVG illustration!
  */
 export async function generateSlideIllustration({
   apiKey,
@@ -85,33 +118,52 @@ export async function generateSlideIllustration({
     `Visual style: ${styleHint}, accent color ${primaryColor}, clean composition, generous negative space, NO cluttered text or watermarks, suitable for a keynote lecture slide.`;
 
   const ai = new GoogleGenAI({ apiKey: resolvedKey });
-  const interaction = await ai.interactions.create({
-    model: 'gemini-nano-banana-2.1',
-    input: fullPrompt,
-  });
+  let lastErr = null;
 
-  let imgData = interaction?.output_image?.data || '';
-  let mimeType = interaction?.output_image?.mime_type || 'image/png';
-
-  if (!imgData && Array.isArray(interaction?.steps)) {
-    for (const step of interaction.steps) {
-      for (const item of step?.content || []) {
-        if (item?.type === 'image' && item?.data) {
-          imgData = item.data;
-          mimeType = item.mime_type || 'image/png';
-        }
+  for (const model of ['gemini-nano-banana-2.1', 'gemini-3.1-flash-lite-image']) {
+    try {
+      const interaction = await ai.interactions.create({ model, input: fullPrompt });
+      const extracted = extractImageFromInteraction(interaction);
+      if (extracted) {
+        const buffer = Buffer.from(extracted.imgData, 'base64');
+        const saved = await saveImageBuffer({
+          buffer,
+          contentType: extracted.mimeType,
+          filenamePrefix: 'ai_illus',
+        });
+        return { ...saved, model };
       }
+    } catch (err) {
+      lastErr = err;
     }
   }
 
-  if (!imgData) {
-    throw new Error('Gemini 未回傳圖片內容，請調整描述後再試');
+  // Fallback for Gemini Free Tier keys: generate custom editorial SVG vector illustration via gemini-4-hydrogen
+  const svgPrompt =
+    `You are a keynote presentation graphic designer. Output ONLY raw valid <svg viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">...</svg> code (no markdown fences, no commentary) creating a rich, modern editorial vector illustration for the slide concept: "${concept}".\n` +
+    `Design rules:\n` +
+    `- Style: ${styleHint}, primary accent ${primaryColor}, complementary cyan (#38bdf8), amber (#fbbf24), emerald (#34d399).\n` +
+    `- Use linearGradient/radialGradient, layered rounded cards, subtle glow filters, geometric metaphors, and expressive vector icons/scenes.\n` +
+    `- Keep text minimal (0 to 3 short labels max in Traditional Chinese or English; no overlapping text).\n` +
+    `- Do NOT include <script>, external images, or event handlers.`;
+
+  try {
+    const svgInteraction = await ai.interactions.create({
+      model: 'gemini-4-hydrogen',
+      input: svgPrompt,
+    });
+    const svgText = sanitizeSvgMarkup(svgInteraction?.output_text || '');
+    if (svgText) {
+      const saved = await saveImageBuffer({
+        buffer: Buffer.from(svgText, 'utf8'),
+        contentType: 'image/svg+xml',
+        filenamePrefix: 'ai_svg',
+      });
+      return { ...saved, model: 'gemini-4-hydrogen (SVG)' };
+    }
+  } catch (svgErr) {
+    throw new Error(svgErr?.message || lastErr?.message || 'AI 生圖失敗');
   }
 
-  const buffer = Buffer.from(imgData, 'base64');
-  return saveImageBuffer({
-    buffer,
-    contentType: mimeType,
-    filenamePrefix: 'ai_illus',
-  });
+  throw new Error(lastErr?.message || 'Gemini 未回傳圖片內容，請調整描述後再試');
 }

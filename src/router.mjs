@@ -537,6 +537,7 @@ export async function createAppContext() {
           ok: true,
           url: saved.url,
           storage: saved.storage,
+          model: saved.model || '',
           state: await store.getAdminState(targetRoom),
         });
       }
