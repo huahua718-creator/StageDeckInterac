@@ -691,16 +691,45 @@ export class UpstashRedisRoomStore {
     ]);
 
     if (rawPkg && rawSession) {
+      const parsedPkg = JSON.parse(rawPkg);
+      const parsedSession = JSON.parse(rawSession);
+      if (
+        !parsedPkg.explicitSheetLock &&
+        this.defaultPackage.builtInHash &&
+        parsedPkg.builtInHash !== this.defaultPackage.builtInHash
+      ) {
+        const refreshedPkg = {
+          config: sanitizeConfig(this.defaultPackage.config),
+          deck: this.defaultPackage.deck,
+          builtInHash: this.defaultPackage.builtInHash,
+          source: this.defaultPackage.source,
+          configSource: this.defaultPackage.configSource || '',
+          deckUrl: this.defaultPackage.deckUrl || '',
+          configUrl: this.defaultPackage.configUrl || '',
+          explicitSheetLock: false,
+        };
+        if (parsedSession.currentIndex >= refreshedPkg.deck.length) {
+          parsedSession.currentIndex = 0;
+          parsedSession.subStep = 0;
+        }
+        parsedSession.version = (parsedSession.version || 1) + 1;
+        await this._pipeline([
+          ['SET', k.pkg, JSON.stringify(refreshedPkg), 'EX', this.roomTtlSec],
+          ['SET', k.session, JSON.stringify(parsedSession), 'EX', this.roomTtlSec],
+        ]);
+        return { roomId: k.roomId, pkg: refreshedPkg, session: parsedSession };
+      }
       return {
         roomId: k.roomId,
-        pkg: JSON.parse(rawPkg),
-        session: JSON.parse(rawSession),
+        pkg: parsedPkg,
+        session: parsedSession,
       };
     }
 
     const pkg = {
       config: sanitizeConfig(this.defaultPackage.config),
       deck: this.defaultPackage.deck,
+      builtInHash: this.defaultPackage.builtInHash || '',
       source: this.defaultPackage.source,
       configSource: this.defaultPackage.configSource || '',
       deckUrl: this.defaultPackage.deckUrl || '',
@@ -746,6 +775,7 @@ export class UpstashRedisRoomStore {
     const pkg = {
       config: sanitizeConfig(loaded.config),
       deck: loaded.deck,
+      builtInHash: loaded.builtInHash || this.defaultPackage.builtInHash || '',
       source: loaded.source,
       configSource: loaded.configSource || '',
       deckUrl: loaded.deckUrl || '',

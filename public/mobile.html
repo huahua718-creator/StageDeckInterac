@@ -158,7 +158,13 @@ function render(){
       html+=parts.map(p=>`<div class="quote-box">${esc(p)}</div>`).join('');
     }else if(layout==='SPLIT'){
       const l=state.columns?.left||[],r=state.columns?.right||[];
-      const blk=(arr,lbl)=>arr.length?`<div class="split-blk"><h3>${esc(lbl)}</h3><ul class="bullet-ul">${arr.map((x,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(x)}</span></li>`).join('')}</ul></div>`:'';
+      const blk=(arr,def)=>{
+        if(!arr.length)return '';
+        const hasH=arr.length>1&&(/[：:]$/.test(arr[0])||(/^[•\-]/.test(arr[1])&&!/^[•\-]/.test(arr[0])));
+        const h=hasH?arr[0].replace(/[：:]$/,''):def;
+        const items=(hasH?arr.slice(1):arr).map(x=>x.replace(/^[•\-]\s*/,''));
+        return `<div class="split-blk"><h3>${esc(h)}</h3><ul class="bullet-ul">${items.map((x,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(x)}</span></li>`).join('')}</ul></div>`;
+      };
       html+=blk(l,'左側觀點')+blk(r,'右側觀點');
     }else if(layout==='MEDIA'){
       if(state.mediaUrl)html+=`<img class="media-img" src="${esc(state.mediaUrl)}" alt="簡報圖解">`;

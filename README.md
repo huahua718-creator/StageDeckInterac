@@ -63,15 +63,33 @@ npm run load-test
 
 ---
 
-## 四、 串接個人 Google Sheets（Zero-Code CMS）
+## 四、 未來如何匯入與切換新的講題主軸（Zero-Code 三種方式）
 
-1. 複製專案內的範本檔案 `data/sample-config.csv` 與 `data/sample-deck.csv` 匯入 Google 試算表。
-2. 於 Google 試算表點選 **「檔案 → 共享 → 發布到網路」**，格式選擇 **「逗號分隔值 (.csv)」**。
-3. 將取得的 CSV 連結貼至 `/admin` 後台的「熱重載更新」，或直接於大螢幕網址帶入參數：`/?room=workshop&sheet=<編碼後的CSV連結>`。
+### 方式 1：Google Sheets 雲端熱重載（最推薦）
+1. 下載專案內的 `data/sample-config.csv` 與 `data/sample-deck.csv` 匯入 Google 試算表。
+2. 於 Google 試算表修改 `Config`（標題、主色票 `#6366f1`、背景主題 `DARK_NEBULA`/`CLEAN_LIGHT`/`TECH_GRID`）與 `Deck`（第 1~N 頁內容與 `speaker_note`）。
+3. 點選 **「檔案 → 共享 → 發布到網路」**，格式選擇 **「逗號分隔值 (.csv)」**，複製連結。
+4. 在 `/admin` 貼上連結點擊 **「🔄 熱重載更新」**，或直接使用帶參數網址開場：
+   - `https://stagedeckinterac.vercel.app/?room=場次名稱&sheet=編碼後的CSV網址`
+
+### 方式 2：在 `/admin` 直接上傳本機 `.csv` 檔
+* 無需公開發布 Google Sheets，在 Excel / Google Sheets 編輯好並「下載為 `.csv`」後，於 `/admin` 介面直接選檔並點擊 **「📤 匯入 CSV 檔」** 即可即時同步至該房間（存入 Upstash Redis）。
+
+### 方式 3：新增內建主題範本（`data/decks/`）
+* 將 `<topic>.csv` 與 `<topic>.config.csv` 放入 `data/decks/` 資料夾（例如內建的 `parent-orientation.csv`），部署後即可在 `/admin` 下拉選單一鍵切換，或透過 `/?room=demo&preset=<topic>` 直接開啟。
 
 ---
 
-## 五、 部署指南（Vercel + Upstash Redis）
+## 五、 系統擴充架構指南
+
+若未來要擴充新的簡報版型或互動視覺模組，僅需依循三層模組化介面修改：
+1. **資料解析層（`src/sheets.mjs`）**：在 `VALID_MODES` 或 `VALID_LAYOUTS` 註冊新代碼並解析對應欄位。
+2. **狀態與計數層（`src/store.mjs`）**：在 `MemoryRoomStore` 與 `UpstashRedisRoomStore` 的 `submitVote` / `_readStats` 加入對應統計邏輯。
+3. **雙端渲染層（`public/index.html` & `public/mobile.html`）**：於大螢幕 Canvas / DOM 渲染器與手機端作答卡片補上對應 `mode` / `layout` 渲染分支。
+
+---
+
+## 六、 部署指南（Vercel + Upstash Redis）
 
 1. **建立 Vercel 專案**：登入 [Vercel](https://vercel.com/) → **Add New Project** → 匯入本 GitHub 專案（Framework Preset 選 `Other`）。
 2. **綁定 Upstash Redis（千人併發必備）**：在 Vercel 專案頁籤 **Storage → Connect Database → Upstash Redis**，一鍵建立並綁定環境變數（`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` 或 `KV_REST_API_*`）。

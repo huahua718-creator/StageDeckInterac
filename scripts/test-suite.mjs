@@ -10,6 +10,9 @@ import {
   rowsToConfig,
   rowsToDeck,
   loadDeckPackage,
+  listPresets,
+  loadPreset,
+  loadDeckFromCsvTexts,
 } from '../src/sheets.mjs';
 import { MemoryRoomStore } from '../src/store.mjs';
 import { createAppContext } from '../src/router.mjs';
@@ -32,15 +35,30 @@ async function runTests() {
     normalizeMediaUrl('https://drive.google.com/file/d/1AbCDefG123/view?usp=sharing'),
     'https://drive.google.com/thumbnail?id=1AbCDefG123&sz=w1600'
   );
+  assert.equal(normalizeMediaUrl('*(可放系統架構圖或試算表截圖)*'), '');
   assert.equal(
     normalizeSheetCsvUrl('https://docs.google.com/spreadsheets/d/1XYZ/edit#gid=42'),
     'https://docs.google.com/spreadsheets/d/1XYZ/export?format=csv&gid=42'
   );
 
-  console.log('2. Testing default workshop package loading & inline CONFIG...');
+  console.log('2. Testing 18-slide workshop package, presets & CSV text import...');
   const pkg = await loadDeckPackage({});
-  assert.ok(pkg.deck.length >= 10, 'Default deck should have at least 10 slides');
+  assert.equal(pkg.deck.length, 18, 'Default workshop deck should have 18 slides');
   assert.equal(pkg.config.primary_color, '#6366f1');
+  assert.equal(pkg.config.event_subtitle, '高中教師增能研習工作坊');
+
+  const presets = listPresets();
+  assert.ok(presets.some((p) => p.id === 'parent-orientation'));
+  const parentPkg = await loadPreset('parent-orientation');
+  assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
+  assert.equal(parentPkg.deck.length, 5);
+
+  const uploadedPkg = loadDeckFromCsvTexts({
+    deckCsv: 'order,mode,layout,title,body\n1,SLIDE,COVER,Test Import,Sub\n',
+    configCsv: 'key,value\nevent_title,Imported Workshop\nprimary_color,#ec4899\n',
+  });
+  assert.equal(uploadedPkg.config.event_title, 'Imported Workshop');
+  assert.equal(uploadedPkg.config.primary_color, '#ec4899');
 
   const inlineDeckRows = parseCSV(
     'order,mode,layout,title,body\n' +
@@ -103,7 +121,7 @@ async function runTests() {
   await store.nextStep('roomA');
   const mobAfter = await store.getMobileState('roomA');
   assert.equal(mobAfter.phase, 'REVEALED');
-  assert.equal(mobAfter.correctOpt, 'opt_2');
+  assert.equal(mobAfter.correctOpt, 'opt_3');
 
   console.log('4. Testing DANMAKU profanity filter & mobile payload budget (< 80 KB)...');
   const dmIdx = customPkg.deck.findIndex((s) => s.mode === 'DANMAKU');
@@ -130,7 +148,7 @@ async function runTests() {
   const base = `http://127.0.0.1:${addr.port}`;
 
   try {
-    for (const p of ['/', '/m', '/admin', '/remote', '/assets/workflow-diagram.svg', '/api/sample-deck.csv', '/api/sample-config.csv']) {
+    for (const p of ['/', '/m', '/admin', '/remote', '/assets/workflow-diagram.svg', '/assets/agent-demo-diagram.svg', '/api/presets', '/api/sample-deck.csv', '/api/sample-config.csv']) {
       const r = await fetch(`${base}${p}`);
       assert.equal(r.status, 200, `GET ${p} should return 200`);
     }

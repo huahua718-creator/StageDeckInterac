@@ -5,7 +5,7 @@ import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import QRCode from 'qrcode';
-import { loadDeckPackage } from './sheets.mjs';
+import { listPresets, loadDeckFromCsvTexts, loadDeckPackage, loadPreset } from './sheets.mjs';
 import { createRoomStore, sanitizeRoomId } from './store.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -277,12 +277,21 @@ export async function createAppContext() {
         return sendJson(res, 200, mobileState, cacheHeaders);
       }
 
-      // Stage state (supports ?sheet=... & ?config=... initialization)
+      // Presets listing
+      if (req.method === 'GET' && pathname === '/api/presets') {
+        return sendJson(res, 200, { presets: listPresets() });
+      }
+
+      // Stage state (supports ?sheet=... & ?config=... & ?preset=... initialization)
       if (req.method === 'GET' && pathname === '/api/stage-state') {
         const sheetUrl = reqUrl.searchParams.get('sheet') || '';
         const configUrl = reqUrl.searchParams.get('config') || '';
+        const presetId = reqUrl.searchParams.get('preset') || '';
         if (sheetUrl) {
           await store.ensureRoomInitialized(roomId, { sheetUrl, configUrl });
+        } else if (presetId) {
+          const loaded = await loadPreset(presetId);
+          await store.setDeckPackage(roomId, loaded, { explicitLock: true });
         }
         const stageState = await store.getStageState(roomId);
         return sendJson(res, 200, {
@@ -429,6 +438,44 @@ export async function createAppContext() {
         const deckUrl = String(body.deckUrl || body.sheetUrl || '').trim();
         const configUrl = String(body.configUrl || '').trim();
         const loaded = await loadDeckPackage({ deckUrl, configUrl });
+        await store.setDeckPackage(targetRoom, loaded, { explicitLock: true });
+        return sendJson(res, 200, {
+          ok: true,
+          count: loaded.deck.length,
+          source: loaded.source,
+          state: await store.getAdminState(targetRoom),
+        });
+      }
+
+      // Admin Built-in Preset Switch
+      if (req.method === 'POST' && pathname === '/api/admin/preset') {
+        const body = await readJsonBody(req);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const targetRoom = sanitizeRoomId(body.roomId || roomId);
+        const loaded = await loadPreset(body.presetId);
+        await store.setDeckPackage(targetRoom, loaded, { explicitLock: true });
+        return sendJson(res, 200, {
+          ok: true,
+          count: loaded.deck.length,
+          source: loaded.source,
+          state: await store.getAdminState(targetRoom),
+        });
+      }
+
+      // Admin Direct CSV Upload Import
+      if (req.method === 'POST' && pathname === '/api/admin/upload-csv') {
+        const body = await readJsonBody(req, 524288);
+        if (!isAuthorized(req, body)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        const targetRoom = sanitizeRoomId(body.roomId || roomId);
+        const loaded = loadDeckFromCsvTexts({
+          deckCsv: String(body.deckCsv || ''),
+          configCsv: String(body.configCsv || ''),
+          sourceLabel: String(body.sourceLabel || '本機 CSV 上傳匯入'),
+        });
         await store.setDeckPackage(targetRoom, loaded, { explicitLock: true });
         return sendJson(res, 200, {
           ok: true,

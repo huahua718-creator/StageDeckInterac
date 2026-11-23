@@ -91,15 +91,23 @@ a{color:var(--sky)}
     </div>
 
     <div class="card">
-      <h3>📊 Google Sheets 通用簡報與題庫熱重載 (Zero-Code CMS)</h3>
+      <h3>📊 講題腳本來源與熱重載 (Zero-Code CMS)</h3>
       <p class="muted" style="margin:0 0 10px">
-        於 Google 試算表「檔案 → 共享 → 發布到網路 → CSV」取得連結並貼上，即可一鍵切換整場講座主題與簡報。
+        支援三種匯入方式：① Google 試算表發布 <code>.csv</code> 連結（推薦，支援現場 <code>[R]</code> 熱重載） ② 一鍵切換內建主題範本 ③ 直接上傳本機 <code>.csv</code> 檔。
         下載範本：<a href="/api/sample-deck.csv" download>Deck 範本 (.csv)</a> ｜ <a href="/api/sample-config.csv" download>Config 範本 (.csv)</a>
       </p>
       <div class="row" style="margin-bottom:10px">
-        <input id="deckInput" type="text" placeholder="貼上 Deck 工作表 CSV 連結（留空則使用內建個人研習示範投影片）">
-        <input id="configInput" type="text" placeholder="選填：Config 工作表 CSV 連結" style="max-width:340px">
+        <input id="deckInput" type="text" placeholder="貼上 Google Sheets Deck CSV 連結（或整份試算表分享連結）">
+        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:300px">
         <button id="syncBtn" class="primary">🔄 熱重載更新</button>
+      </div>
+      <div class="row" style="margin-bottom:10px;padding-top:10px;border-top:1px dashed var(--border)">
+        <select id="presetSelect" style="flex:1;min-width:220px;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#091020;color:var(--text);font-size:14px"></select>
+        <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
+        <label class="muted" style="display:flex;align-items:center;gap:6px">
+          本機 Deck CSV：<input id="csvFileInput" type="file" accept=".csv,text/csv" style="max-width:220px;font-size:12px">
+        </label>
+        <button id="uploadCsvBtn" class="ghost">📤 匯入 CSV 檔</button>
       </div>
       <div class="row" style="justify-content:space-between">
         <span id="syncMsg" class="muted"></span>
@@ -204,6 +212,7 @@ async function tryLogin(inputPwd) {
     $('deckInput').value = state.deckUrl || '';
     $('configInput').value = state.configUrl || '';
     setupLinks(res.remoteToken);
+    loadPresetsList();
     render();
   } catch (e) {
     $('loginErr').textContent = e.message;
@@ -266,6 +275,46 @@ $('syncBtn').onclick = async () => {
     render();
   } catch (e) {
     $('syncMsg').textContent = `✕ 同步失敗：${e.message}`;
+  }
+};
+
+async function loadPresetsList() {
+  try {
+    const r = await fetch('/api/presets').then(x => x.json());
+    $('presetSelect').innerHTML = (r.presets || []).map(p => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('');
+  } catch {}
+}
+
+$('presetBtn').onclick = async () => {
+  const presetId = $('presetSelect').value || 'default';
+  $('syncMsg').textContent = '切換範本中...';
+  try {
+    const res = await api('/api/admin/preset', 'POST', { presetId });
+    state = res.state;
+    $('deckInput').value = '';
+    $('configInput').value = '';
+    $('syncMsg').textContent = `✓ 已切換為範本：${res.source}（共 ${res.count} 頁）`;
+    render();
+  } catch (e) {
+    $('syncMsg').textContent = `✕ 切換失敗：${e.message}`;
+  }
+};
+
+$('uploadCsvBtn').onclick = async () => {
+  const file = $('csvFileInput').files?.[0];
+  if (!file) {
+    $('syncMsg').textContent = '請先選擇一個 .csv 檔案';
+    return;
+  }
+  $('syncMsg').textContent = '匯入 CSV 中...';
+  try {
+    const deckCsv = await file.text();
+    const res = await api('/api/admin/upload-csv', 'POST', { deckCsv, sourceLabel: `本機檔案 (${file.name})` });
+    state = res.state;
+    $('syncMsg').textContent = `✓ 已從 ${file.name} 匯入 ${res.count} 頁`;
+    render();
+  } catch (e) {
+    $('syncMsg').textContent = `✕ 匯入失敗：${e.message}`;
   }
 };
 

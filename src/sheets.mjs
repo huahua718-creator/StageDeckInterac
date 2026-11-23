@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -121,6 +122,7 @@ export function normalizeSheetCsvUrl(rawUrl, sheetName = '') {
 
 /**
  * Convert Google Drive file sharing URLs into direct image URLs.
+ * Ignores placeholder notes like "*(可放截圖)*".
  */
 export function normalizeMediaUrl(rawUrl) {
   const url = String(rawUrl || '').trim();
@@ -133,7 +135,10 @@ export function normalizeMediaUrl(rawUrl) {
   if (openMatch) {
     return `https://drive.google.com/thumbnail?id=${openMatch[1]}&sz=w1600`;
   }
-  return url;
+  if (/^(https?:\/\/|\/|data:image\/)/i.test(url)) {
+    return url;
+  }
+  return '';
 }
 
 export function sanitizeConfig(raw = {}) {
@@ -349,16 +354,75 @@ export async function loadDeckPackage({ deckUrl = '', configUrl = '' } = {}) {
   const sampleDeckPath = path.join(DATA_DIR, 'sample-deck.csv');
   const cfgText = fs.readFileSync(sampleConfigPath, 'utf8');
   const deckText = fs.readFileSync(sampleDeckPath, 'utf8');
+  const builtInHash = crypto.createHash('sha1').update(cfgText + '\n' + deckText).digest('hex').slice(0, 12);
   const { deck, inlineConfig } = rowsToDeck(parseCSV(deckText));
   const config = sanitizeConfig({ ...rowsToConfig(parseCSV(cfgText)), ...inlineConfig });
 
   return {
     config,
     deck,
-    source: 'sample-deck.csv (內建個人研習講座範本)',
+    builtInHash,
+    source: 'sample-deck.csv (用 AI 改善工作流 18 頁研習版)',
     configSource: 'sample-config.csv',
     deckUrl: '',
     configUrl: '',
     isFallback: true,
   };
+}
+
+/**
+ * Parse raw CSV strings uploaded directly from /admin or presets.
+ */
+export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '本機匯入 CSV' }) {
+  const { deck, inlineConfig } = rowsToDeck(parseCSV(deckCsv));
+  const baseCfg = configCsv ? rowsToConfig(parseCSV(configCsv)) : {};
+  const config = sanitizeConfig({ ...baseCfg, ...inlineConfig });
+  return {
+    config,
+    deck,
+    source: sourceLabel,
+    configSource: configCsv ? '本機匯入 Config' : '',
+    deckUrl: '',
+    configUrl: '',
+    isFallback: false,
+  };
+}
+
+const PRESET_LABELS = {
+  default: '用 AI 改善工作流──邁向優雅的教師生活（18頁研習版）',
+  'parent-orientation': '115 學年度新生入學說明會（範例範本）',
+};
+
+export function listPresets() {
+  const presets = [{ id: 'default', label: PRESET_LABELS.default }];
+  const decksDir = path.join(DATA_DIR, 'decks');
+  if (fs.existsSync(decksDir)) {
+    for (const f of fs.readdirSync(decksDir)) {
+      if (!f.endsWith('.csv') || f.endsWith('.config.csv')) continue;
+      const id = f.slice(0, -4);
+      presets.push({ id, label: PRESET_LABELS[id] || id });
+    }
+  }
+  return presets;
+}
+
+export async function loadPreset(presetId = 'default') {
+  const cleanId = String(presetId || 'default').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!cleanId || cleanId === 'default') {
+    const pkg = await loadDeckPackage({});
+    return { ...pkg, isFallback: false };
+  }
+  const decksDir = path.join(DATA_DIR, 'decks');
+  const deckPath = path.join(decksDir, `${cleanId}.csv`);
+  if (!fs.existsSync(deckPath)) {
+    throw new Error(`找不到內建範本：${cleanId}`);
+  }
+  const cfgPath = path.join(decksDir, `${cleanId}.config.csv`);
+  const deckCsv = fs.readFileSync(deckPath, 'utf8');
+  const configCsv = fs.existsSync(cfgPath) ? fs.readFileSync(cfgPath, 'utf8') : '';
+  return loadDeckFromCsvTexts({
+    deckCsv,
+    configCsv,
+    sourceLabel: `preset:${cleanId} (${PRESET_LABELS[cleanId] || cleanId})`,
+  });
 }

@@ -337,6 +337,7 @@ const params = new URLSearchParams(location.search);
 const roomId = params.get('room') || 'main';
 const sheetParam = params.get('sheet') || '';
 const configParam = params.get('config') || '';
+const presetParam = params.get('preset') || '';
 let presenterToken = params.get('token') || localStorage.getItem('sdi_stage_token_' + roomId) || '';
 if (params.get('token')) {
   localStorage.setItem('sdi_stage_token_' + roomId, presenterToken);
@@ -641,9 +642,9 @@ function renderSlideDOM(s) {
     const right = s.columns?.right || [];
     const renderCol = (arr, isRight) => {
       if (!arr.length) return '';
-      const hasHead = arr.length > 1 && /[：:]$/.test(arr[0]);
+      const hasHead = arr.length > 1 && (/[：:]$/.test(arr[0]) || (/^[•\-]/.test(arr[1]) && !/^[•\-]/.test(arr[0])));
       const head = hasHead ? arr[0].replace(/[：:]$/, '') : (isRight ? '解決方案 / 建議' : '現況 / 對照');
-      const list = hasHead ? arr.slice(1) : arr;
+      const list = (hasHead ? arr.slice(1) : arr).map(x => x.replace(/^[•\-]\s*/, ''));
       return `
         <div class="split-card ${isRight ? 'right' : ''}">
           <h2 class="split-head"><span class="split-badge"></span>${esc(head)}</h2>
@@ -1053,6 +1054,7 @@ async function fetchStageState(withSheet = false) {
     let url = `/api/stage-state?room=${encodeURIComponent(roomId)}`;
     if (withSheet && sheetParam) url += `&sheet=${encodeURIComponent(sheetParam)}`;
     if (withSheet && configParam) url += `&config=${encodeURIComponent(configParam)}`;
+    if (withSheet && presetParam) url += `&preset=${encodeURIComponent(presetParam)}`;
     const r = await fetch(url);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
