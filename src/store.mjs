@@ -1,4 +1,4 @@
-import { buildSlideObject, DEFAULT_CONFIG, loadDeckPackage, sanitizeConfig } from './sheets.mjs';
+import { buildSlideObject, DEFAULT_CONFIG, extractDeckLinks, loadDeckPackage, sanitizeConfig, sanitizeLinkSlug } from './sheets.mjs';
 
 const BAD_WORDS = [
   '幹你娘', '靠北', '靠腰', '白痴', '智障', '垃圾', '去死', 'fuck', 'shit', 'bitch', 'asshole',
@@ -65,7 +65,7 @@ function resolveEffectivePhase(session, slide) {
   return session.phase;
 }
 
-function formatMobilePayload(session, slide, config, deckLen) {
+function formatMobilePayload(session, slide, config, deckLen, allLinks = []) {
   const phase = resolveEffectivePhase(session, slide);
   if (!slide) {
     return {
@@ -75,6 +75,7 @@ function formatMobilePayload(session, slide, config, deckLen) {
       idx: 0,
       total: 0,
       phase: 'LOCKED',
+      allLinks,
     };
   }
   const base = {
@@ -95,6 +96,8 @@ function formatMobilePayload(session, slide, config, deckLen) {
     diagramCode: slide.diagramCode || '',
     chartSpec: slide.chartSpec || null,
     cardsSpec: slide.cardsSpec || null,
+    linksSpec: slide.linksSpec || null,
+    allLinks,
     mediaUrl: slide.mediaUrl,
     options: slide.options,
     phase,
@@ -223,6 +226,7 @@ function mapAdminDeckList(deck) {
     body: s.body,
     mediaUrl: s.mediaUrl,
     imagePrompt: s.imagePrompt || '',
+    linksSpec: s.linksSpec || null,
     options: s.options || [],
     correctOpt: s.correctOpt || '',
     explanation: s.explanation || '',
@@ -666,16 +670,23 @@ export class MemoryRoomStore {
     return { ok: false, code: 'UNSUPPORTED', message: '不支援的互動模式' };
   }
 
+  async resolveShortLink(roomId, slug) {
+    const clean = sanitizeLinkSlug(slug);
+    if (!clean) return null;
+    const room = this._ensureRoom(roomId);
+    return extractDeckLinks(room.deck).find((l) => l.slug === clean) || null;
+  }
+
   async getMobileState(roomId) {
     const room = this._ensureRoom(roomId);
     const cur = room.deck[room.session.currentIndex] || null;
-    return formatMobilePayload(room.session, cur, room.config, room.deck.length);
+    return formatMobilePayload(room.session, cur, room.config, room.deck.length, extractDeckLinks(room.deck));
   }
 
   async getStageState(roomId) {
     const room = this._ensureRoom(roomId);
     const cur = room.deck[room.session.currentIndex] || null;
-    const mobile = formatMobilePayload(room.session, cur, room.config, room.deck.length);
+    const mobile = formatMobilePayload(room.session, cur, room.config, room.deck.length, extractDeckLinks(room.deck));
     const b = this._getBucket(room, cur);
     const stats = b
       ? {
@@ -1331,10 +1342,17 @@ export class UpstashRedisRoomStore {
     return { ok: false, code: 'UNSUPPORTED', message: '不支援的互動模式' };
   }
 
+  async resolveShortLink(roomId, slug) {
+    const clean = sanitizeLinkSlug(slug);
+    if (!clean) return null;
+    const state = await this._loadRoom(roomId);
+    return extractDeckLinks(state.pkg.deck).find((l) => l.slug === clean) || null;
+  }
+
   async getMobileState(roomId) {
     const state = await this._loadRoom(roomId);
     const cur = state.pkg.deck[state.session.currentIndex] || null;
-    return formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length);
+    return formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length, extractDeckLinks(state.pkg.deck));
   }
 
   _hashArrayToMap(arr) {
@@ -1398,7 +1416,7 @@ export class UpstashRedisRoomStore {
   async getStageState(roomId) {
     const state = await this._loadRoom(roomId);
     const cur = state.pkg.deck[state.session.currentIndex] || null;
-    const mobile = formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length);
+    const mobile = formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length, extractDeckLinks(state.pkg.deck));
     const { stats } = await this._readStats(roomId, cur);
 
     return {
@@ -1425,7 +1443,7 @@ export class UpstashRedisRoomStore {
     const state = await this._loadRoom(roomId);
     const cur = state.pkg.deck[state.session.currentIndex] || null;
     const nextSlide = state.pkg.deck[state.session.currentIndex + 1] || null;
-    const mobile = formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length);
+    const mobile = formatMobilePayload(state.session, cur, state.pkg.config, state.pkg.deck.length, extractDeckLinks(state.pkg.deck));
     const { stats, allMessages } = await this._readStats(roomId, cur);
 
     return {

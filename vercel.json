@@ -7,7 +7,9 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.mjs" },
+    { "source": "/go/:slug", "destination": "/api/go?slug=:slug" },
     { "source": "/m", "destination": "/mobile.html" },
+    { "source": "/pc", "destination": "/mobile.html" },
     { "source": "/admin", "destination": "/admin.html" },
     { "source": "/remote", "destination": "/remote.html" },
     { "source": "/", "destination": "/index.html" }
@@ -15,6 +17,12 @@
   "headers": [
     {
       "source": "/m",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=60, s-maxage=300" }
+      ]
+    },
+    {
+      "source": "/pc",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=60, s-maxage=300" }
       ]

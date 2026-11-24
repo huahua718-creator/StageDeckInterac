@@ -25,6 +25,7 @@ export const VALID_LAYOUTS = new Set([
   'DIAGRAM',
   'CHART',
   'CARDS',
+  'LINKS',
 ]);
 
 export const VALID_THEMES = new Set([
@@ -285,6 +286,108 @@ export function parseCardsSpec(body, flowFlag = false) {
   return { flow, cards };
 }
 
+export function normalizeLinkUrl(rawUrl) {
+  const url = String(rawUrl || '').trim();
+  if (!url) return '';
+  if (/^https?:\/\/\S+/i.test(url)) return url;
+  return '';
+}
+
+export function sanitizeLinkSlug(rawSlug) {
+  return String(rawSlug || '')
+    .trim()
+    .replace(/^\/?go\//i, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .toLowerCase()
+    .slice(0, 32);
+}
+
+/**
+ * Parse LINKS body text into { links: [{ tag, title, url, desc, slug }] }.
+ * Canonical chunk format: "tag | title | url | desc | slug" separated by "::" or "\n".
+ */
+export function parseLinksSpec(body, order = 1) {
+  const raw = String(body || '').replace(/\\n/g, '\n');
+  const chunks = raw.includes('::')
+    ? raw.split('::').map((s) => s.trim()).filter(Boolean)
+    : raw.split(/\n/).map((s) => s.trim()).filter(Boolean);
+
+  const links = [];
+  for (const chunk of chunks) {
+    const clean = chunk.replace(/^[-*•]\s*/, '').trim();
+    if (!clean) continue;
+    const parts = clean.split('|').map((s) => s.trim());
+    const uIdx = parts.findIndex((p) => /^https?:\/\//i.test(p));
+    let tag = '';
+    let title = '';
+    let url = '';
+    let desc = '';
+    let slug = '';
+
+    if (uIdx !== -1) {
+      url = normalizeLinkUrl(parts[uIdx]);
+      if (uIdx === 0) {
+        title = parts[1] || url;
+        desc = parts[2] || '';
+        slug = sanitizeLinkSlug(parts[3] || '');
+      } else if (uIdx === 1) {
+        title = parts[0] || url;
+        desc = parts[2] || '';
+        slug = sanitizeLinkSlug(parts[3] || '');
+      } else {
+        tag = parts[0] || '';
+        title = parts.slice(1, uIdx).filter(Boolean).join(' · ') || url;
+        desc = parts[uIdx + 1] || '';
+        slug = sanitizeLinkSlug(parts[uIdx + 2] || '');
+      }
+    } else if (parts.length >= 2) {
+      tag = parts[0] || '';
+      title = parts[1] || parts[0] || '';
+      desc = parts.slice(2).filter(Boolean).join(' · ');
+    }
+
+    if (!url && !title) continue;
+    if (!slug) {
+      slug = `link${order}-${links.length + 1}`;
+    }
+    links.push({
+      tag: tag || `STEP ${String(links.length + 1).padStart(2, '0')}`,
+      title: title || url,
+      url,
+      desc,
+      slug,
+    });
+  }
+  return { links };
+}
+
+export function extractDeckLinks(deck = []) {
+  const out = [];
+  const seenSlugs = new Set();
+  for (const s of deck) {
+    if (!s || s.mode !== 'SLIDE' || s.layout !== 'LINKS') continue;
+    const items = s.linksSpec?.links || [];
+    for (const item of items) {
+      if (!item.url) continue;
+      let slug = sanitizeLinkSlug(item.slug);
+      if (!slug || seenSlugs.has(slug)) {
+        slug = sanitizeLinkSlug(`${slug || 'go'}-${s.order}-${out.length + 1}`);
+      }
+      seenSlugs.add(slug);
+      out.push({
+        order: s.order,
+        slideTitle: s.title,
+        tag: item.tag || '',
+        title: item.title || item.url,
+        desc: item.desc || '',
+        url: item.url,
+        slug,
+      });
+    }
+  }
+  return out;
+}
+
 function buildSlideObject({
   order,
   mode,
@@ -302,6 +405,7 @@ function buildSlideObject({
   diagramCode = '',
   chartSpec = null,
   cardsSpec = null,
+  linksSpec = null,
   rIdx = 1,
 }) {
   const cleanBody = String(body || '').replace(/\\n/g, '\n');
@@ -337,6 +441,11 @@ function buildSlideObject({
       ? cardsSpec || parseCardsSpec(cleanBody)
       : null;
 
+  const resolvedLinks =
+    normMode === 'SLIDE' && normLayout === 'LINKS'
+      ? linksSpec || parseLinksSpec(cleanBody, order)
+      : null;
+
   return {
     id: `s_${order}_${normMode}_${rIdx}`,
     order,
@@ -350,6 +459,7 @@ function buildSlideObject({
     diagramCode: resolvedDiagram,
     chartSpec: resolvedChart,
     cardsSpec: resolvedCards,
+    linksSpec: resolvedLinks,
     mediaUrl: normalizeMediaUrl(mediaUrl),
     imagePrompt: String(imagePrompt || '').trim(),
     options,

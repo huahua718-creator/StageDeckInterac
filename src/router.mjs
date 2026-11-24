@@ -211,9 +211,30 @@ export async function createAppContext() {
     try {
       // Page routes (local Node; on Vercel, vercel.json serves static files directly)
       if (req.method === 'GET' && pathname === '/') return sendHtml(req, res, 'index');
-      if (req.method === 'GET' && pathname === '/m') return sendHtml(req, res, 'mobile');
+      if (req.method === 'GET' && (pathname === '/m' || pathname === '/pc')) return sendHtml(req, res, 'mobile');
       if (req.method === 'GET' && pathname === '/admin') return sendHtml(req, res, 'admin');
       if (req.method === 'GET' && pathname === '/remote') return sendHtml(req, res, 'remote');
+
+      // Global short-link redirector (/go/:slug or Vercel rewrite /api/go?slug=...)
+      if (req.method === 'GET' && (pathname.startsWith('/go/') || pathname === '/api/go')) {
+        const rawSlug =
+          pathname === '/api/go'
+            ? reqUrl.searchParams.get('slug') || ''
+            : decodeURIComponent(pathname.slice(4).split('/')[0] || '');
+        const lookupRoom = reqUrl.searchParams.get('room') ? roomId : defaultRoom;
+        const found = await store.resolveShortLink(lookupRoom, rawSlug);
+        if (found && /^https?:\/\//i.test(found.url)) {
+          res.writeHead(302, {
+            Location: found.url,
+            'Cache-Control': 'no-store',
+          });
+          res.end();
+          return;
+        }
+        res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.end(`<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>找不到短網址</title></head><body style="font-family:sans-serif;background:#090f1f;color:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px;text-align:center"><div style="max-width:440px;background:#121b30;border:1px solid #24324d;border-radius:18px;padding:28px"><h2 style="margin:0 0 10px">找不到短網址 <code>/go/${rawSlug.replace(/[<>&"]/g, '')}</code></h2><p style="color:#94a3b8;line-height:1.6">請確認代碼是否正確，或直接進入筆電同步入口查看全部實作連結。</p><a href="/pc" style="display:inline-block;margin-top:12px;padding:12px 20px;border-radius:12px;background:#6366f1;color:#fff;text-decoration:none;font-weight:700">💻 前往筆電工作區 (/pc)</a></div></body></html>`);
+        return;
+      }
 
       // Static assets & local uploads
       if (req.method === 'GET' && (pathname.startsWith('/assets/') || pathname.startsWith('/uploads/'))) {

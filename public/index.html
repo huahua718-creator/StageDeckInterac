@@ -238,6 +238,17 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
   width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;
   display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;z-index:2;
 }
+.links-banner{
+  display:inline-flex;align-items:center;gap:10px;padding:10px 18px;border-radius:14px;
+  background:var(--primary-soft);border:1.5px solid var(--primary-border);
+  font-size:clamp(15px,1.4vw,20px);font-weight:700;margin-bottom:14px;
+}
+.link-short-pill{
+  margin-top:auto;padding:10px 14px;border-radius:12px;
+  background:var(--primary-soft);border:1px solid var(--primary-border);
+  color:var(--primary);font-size:clamp(14px,1.25vw,18px);font-weight:800;
+  word-break:break-all;letter-spacing:.01em;
+}
 @media(max-width:860px){.flow-arrow{display:none}}
 
 /* Spotlight Danmaku */
@@ -583,7 +594,7 @@ function renderSlideDOM(s) {
   const interHeader = document.getElementById('interactiveHeader');
 
   if (!s) return;
-  const key = `${s.slideId}|${s.mode}|${s.layout}|${s.subStep}|${s.title}|${s.body}|${s.mediaUrl}|${s.diagramCode || ''}`;
+  const key = `${s.slideId}|${s.mode}|${s.layout}|${s.subStep}|${s.title}|${s.body}|${s.mediaUrl}|${s.diagramCode || ''}|${JSON.stringify(s.linksSpec || '')}`;
   const isSlide = s.mode === 'SLIDE';
 
   // Floating QR visibility: hide automatically on COVER (which has large QR card) unless user explicitly toggled on non-cover
@@ -635,6 +646,7 @@ function renderSlideDOM(s) {
   lastSlideKey = key;
 
   const layout = s.layout || 'BULLETS';
+  const pcUrl = `${location.host}/pc${roomId && roomId !== 'main' ? '?room=' + encodeURIComponent(roomId) : ''}`;
   if (layout === 'COVER') {
     const qrSrc = '/api/qr.svg?url=' + encodeURIComponent(joinUrl);
     innerEl.innerHTML = `
@@ -650,6 +662,7 @@ function renderSlideDOM(s) {
           <div class="cover-qr-box"><img id="coverQrImg" src="${qrSrc}" alt="QR Code"></div>
           <div class="cover-qr-label">📱 掃描領取同步講義 &amp; 互動</div>
           <div class="cover-qr-url">${esc(displayUrl)}</div>
+          <div style="margin-top:10px;padding:7px 12px;border-radius:10px;background:var(--primary-soft);border:1px solid var(--primary-border);font-size:13px;font-weight:800;color:var(--primary)">💻 筆電同步入口：${esc(pcUrl)}</div>
         </div>
       </div>`;
   } else if (layout === 'QUOTE') {
@@ -756,6 +769,26 @@ function renderSlideDOM(s) {
               ${spec.flow && i < cards.length - 1 ? '<span class="flow-arrow">➔</span>' : ''}
             </div>
           `).join('')}
+        </div>
+      </div>`;
+  } else if (layout === 'LINKS') {
+    const links = s.linksSpec?.links || [];
+    innerEl.innerHTML = `
+      <div>
+        <h1 class="slide-h">${esc(s.title)}</h1>
+        ${s.subtitle ? `<p class="slide-sub">${esc(s.subtitle)}</p>` : ''}
+        <div class="links-banner">💻 筆電一鍵開啟連結：<span>${esc(pcUrl)}</span>（或於瀏覽器輸入下方短網址）</div>
+        <div class="cards-grid">
+          ${links.map((lk, i) => {
+            const shortUrl = `${location.host}/go/${lk.slug}`;
+            return `
+            <div class="info-card" style="border-top-color:${COLORS[i % COLORS.length]}">
+              <span class="info-tag">${esc(lk.tag || `STEP 0${i + 1}`)}</span>
+              <h2 class="info-title">${esc(lk.title)}</h2>
+              ${lk.desc ? `<p class="info-desc">${esc(lk.desc)}</p>` : ''}
+              ${lk.url ? `<div class="link-short-pill">🔗 ${esc(shortUrl)}</div>` : ''}
+            </div>`;
+          }).join('')}
         </div>
       </div>`;
   }

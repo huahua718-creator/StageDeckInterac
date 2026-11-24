@@ -61,6 +61,21 @@ textarea,input[type=text]{width:100%;padding:12px 13px;border-radius:13px;border
 .modal.show{display:flex}
 .sheet{width:100%;max-width:480px;max-height:82dvh;overflow-y:auto;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:18px}
 .bm-item{padding:12px;border:1px solid var(--border);border-radius:12px;margin-bottom:10px;font-size:14px}
+.links-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.link-card{padding:15px;border:1.5px solid var(--border);border-radius:14px;background:rgba(148,163,184,.05);display:flex;flex-direction:column;gap:8px}
+.link-card.done{border-color:var(--ok);background:rgba(34,197,94,.08)}
+.link-tag{display:inline-block;align-self:flex-start;padding:3px 9px;border-radius:999px;background:rgba(99,102,241,.18);color:var(--primary);font-size:12px;font-weight:800}
+.link-go{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 14px;border-radius:11px;background:var(--primary);color:#fff;text-decoration:none;font-weight:800;font-size:15px}
+.link-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;padding-top:4px}
+.link-btn{flex:1;min-width:96px;padding:9px 10px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text);font-size:13px;font-weight:700;cursor:pointer}
+@media(min-width:800px){
+  .wrap{max-width:960px;padding:22px 28px 44px}
+  .card{padding:26px 30px}
+  h1{font-size:26px}
+  .links-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+  .modal{align-items:center}
+  .sheet{max-width:680px}
+}
 </style>
 </head>
 <body>
@@ -68,11 +83,23 @@ textarea,input[type=text]{width:100%;padding:12px 13px;border-radius:13px;border
   <div class="top">
     <span id="evTitle" class="ev">現場互動講義</span>
     <div class="top-r">
+      <button id="openLinksBtn" class="pill" style="border:0;cursor:pointer;display:none">🧰 實作網址 <span id="lkCount">0</span></button>
       <button id="openNotesBtn" class="pill" style="border:0;cursor:pointer">⭐ <span id="bmCount">0</span></button>
       <span class="pill"><span id="connDot" class="dot"></span><span id="qBadge">連線中</span></span>
     </div>
   </div>
   <div id="app" class="card">載入簡報中...</div>
+</div>
+
+<div id="linksModal" class="modal">
+  <div class="sheet">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <h2 style="margin:0;font-size:18px">🧰 本場講座實作網址工具箱</h2>
+      <button onclick="$('linksModal').classList.remove('show')" style="border:1px solid var(--border);background:transparent;color:var(--text);padding:6px 12px;border-radius:8px;cursor:pointer">關閉</button>
+    </div>
+    <p class="sub" style="margin-bottom:12px">切換頁面後依然可以隨時回來這裡點擊開啟網址與追蹤進度。</p>
+    <div id="linksModalList" class="links-grid"></div>
+  </div>
 </div>
 
 <div id="notesModal" class="modal">
@@ -93,16 +120,40 @@ textarea,input[type=text]{width:100%;padding:12px 13px;border-radius:13px;border
 <script>
 const params=new URLSearchParams(location.search);
 const roomId=params.get('room')||'main';
+const isPc=location.pathname==='/pc';
+if(isPc)document.title='筆電實作工作區';
 const UUID_KEY='sdi_uuid';
 let uuid=localStorage.getItem(UUID_KEY);
 if(!uuid){uuid=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));localStorage.setItem(UUID_KEY,uuid);}
 const $=id=>document.getElementById(id);
 const BM_KEY='sdi_bm_'+roomId;
+const DONE_KEY='sdi_done_'+roomId;
 
 let state=null,lastRenderKey='',pollIv=null,es=null;
 let spectrumVal=50,quadX=50,quadY=50,selectedTag='';
 
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function getDoneMap(){try{return JSON.parse(localStorage.getItem(DONE_KEY)||'{}')}catch{return{}}}
+function toggleDone(u){const m=getDoneMap();if(m[u])delete m[u];else m[u]=1;try{localStorage.setItem(DONE_KEY,JSON.stringify(m))}catch{}lastRenderKey='';render();if($('linksModal').classList.contains('show'))openLinksModal();}
+function renderLinksHtml(links){
+  if(!links||!links.length)return '<div class="msg info">本頁尚未設定連結</div>';
+  const dm=getDoneMap();
+  return `<div class="links-grid">${links.map(lk=>{
+    const done=Boolean(dm[lk.url]);
+    const shortU=lk.slug?location.origin+'/go/'+lk.slug:'';
+    return `<div class="link-card ${done?'done':''}">
+      ${lk.tag?`<span class="link-tag">${esc(lk.tag)}</span>`:''}
+      <div style="font-weight:800;font-size:17px">${esc(lk.title)}</div>
+      ${lk.desc?`<div style="font-size:13px;color:var(--muted);line-height:1.5">${esc(lk.desc)}</div>`:''}
+      ${shortU?`<div style="font-size:12px;color:var(--muted);word-break:break-all">短網址：<code>${esc(shortU)}</code></div>`:''}
+      ${lk.url?`<a class="link-go" href="${esc(lk.url)}" target="_blank" rel="noopener noreferrer">🚀 開啟網頁</a>`:''}
+      <div class="link-acts">
+        ${lk.url?`<button type="button" class="link-btn" data-copy="${esc(lk.url)}">📋 複製網址</button>`:''}
+        ${lk.url?`<button type="button" class="link-btn" data-done="${esc(lk.url)}">${done?'✅ 已完成':'☐ 標記完成'}</button>`:''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
 function getBookmarks(){try{return JSON.parse(localStorage.getItem(BM_KEY)||'[]')}catch{return[]}}
 function saveBookmarks(arr){try{localStorage.setItem(BM_KEY,JSON.stringify(arr))}catch{}$('bmCount').textContent=arr.length;}
 function isBookmarked(slideId){return getBookmarks().some(b=>b.slideId===slideId);}
@@ -138,13 +189,16 @@ function render(){
   const cfg=state.config||{};
   document.documentElement.style.setProperty('--primary',cfg.primary_color||'#6366f1');
   document.body.className='theme-'+(cfg.bg_theme||'DARK_NEBULA');
-  $('evTitle').textContent=cfg.event_title||'現場互動講義';
+  $('evTitle').textContent=(isPc?'💻 ':'')+(cfg.event_title||'現場互動講義');
   $('qBadge').textContent=`第 ${state.idx+1} / ${state.total||1} 頁`;
   $('bmCount').textContent=getBookmarks().length;
+  const allLinks=state.allLinks||[];
+  $('lkCount').textContent=allLinks.length;
+  $('openLinksBtn').style.display=allLinks.length?'inline-flex':'none';
 
   const voted=getVoted(state.slideId);
   const bm=isBookmarked(state.slideId);
-  const key=[state.slideId,state.mode,state.layout,state.phase,state.timerEndsAt,state.correctOpt||'',voted?JSON.stringify(voted):'',bm].join('|');
+  const key=[state.slideId,state.mode,state.layout,state.phase,state.timerEndsAt,state.correctOpt||'',voted?JSON.stringify(voted):'',bm,JSON.stringify(state.linksSpec||null),JSON.stringify(getDoneMap())].join('|');
   if(lastRenderKey===key)return;
   lastRenderKey=key;
 
@@ -180,6 +234,8 @@ function render(){
     }else if(layout==='CARDS'){
       const cards=state.cardsSpec?.cards||[];
       html+=cards.map((c,i)=>`<div class="split-blk"><h3>${esc((c.tag?c.tag+' · ':'')+c.title)}</h3>${c.desc?`<div style="font-size:14px;color:var(--muted)">${esc(c.desc)}</div>`:''}</div>`).join('');
+    }else if(layout==='LINKS'){
+      html+=renderLinksHtml(state.linksSpec?.links||[]);
     }else if(state.bullets?.length){
       if(state.mediaUrl)html+=`<img class="media-img" style="margin-bottom:10px" src="${esc(state.mediaUrl)}" alt="配圖">`;
       html+=`<ul class="bullet-ul">${state.bullets.map((b,i)=>`<li><span class="b-idx">${i+1}</span><span>${esc(b)}</span></li>`).join('')}</ul>`;
@@ -265,10 +321,24 @@ function render(){
   updateTimer();
 }
 
+function bindLinkBtns(root){
+  root.querySelectorAll('[data-copy]').forEach(btn=>{
+    btn.onclick=async()=>{
+      await navigator.clipboard?.writeText(btn.dataset.copy);
+      const old=btn.textContent;btn.textContent='✓ 已複製';
+      setTimeout(()=>{btn.textContent=old;},1400);
+    };
+  });
+  root.querySelectorAll('[data-done]').forEach(btn=>{
+    btn.onclick=()=>toggleDone(btn.dataset.done);
+  });
+}
+
 function bindEvents(){
   const bmT=$('bmToggleBtn'),bmO=$('bmOpenBtn');
   if(bmT)bmT.onclick=toggleBookmark;
   if(bmO)bmO.onclick=openNotesModal;
+  bindLinkBtns($('app'));
 
   $('app').querySelectorAll('[data-opt]').forEach(btn=>{
     btn.onclick=async()=>{
@@ -379,8 +449,15 @@ $('dlNotesBtn').onclick=()=>{
   a.click();
 };
 
+function openLinksModal(){
+  $('linksModalList').innerHTML=renderLinksHtml(state?.allLinks||[]);
+  bindLinkBtns($('linksModalList'));
+  $('linksModal').classList.add('show');
+}
+$('openLinksBtn').onclick=openLinksModal;
+
 function applyState(next){
-  if(!state||next.v!==state.v||next.slideId!==state.slideId||next.phase!==state.phase){
+  if(!state||next.v!==state.v||next.slideId!==state.slideId||next.phase!==state.phase||JSON.stringify(next.linksSpec||null)!==JSON.stringify(state.linksSpec||null)||JSON.stringify(next.allLinks||[])!==JSON.stringify(state.allLinks||[])){
     state=next;render();
   }
 }

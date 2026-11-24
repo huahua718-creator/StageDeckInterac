@@ -165,7 +165,7 @@ async function runTests() {
   const base = `http://127.0.0.1:${addr.port}`;
 
   try {
-    for (const p of ['/', '/m', '/admin', '/remote', '/assets/workflow-diagram.svg', '/assets/agent-demo-diagram.svg', '/api/presets', '/api/sample-deck.csv', '/api/sample-config.csv']) {
+    for (const p of ['/', '/m', '/pc', '/admin', '/remote', '/assets/workflow-diagram.svg', '/assets/agent-demo-diagram.svg', '/api/presets', '/api/sample-deck.csv', '/api/sample-config.csv']) {
       const r = await fetch(`${base}${p}`);
       assert.equal(r.status, 200, `GET ${p} should return 200`);
     }
@@ -279,6 +279,38 @@ async function runTests() {
     assert.equal(batchMediaRes.status, 200);
     const bmJson = await batchMediaRes.json();
     assert.equal(bmJson.state.deckList[0].mediaUrl, '/assets/workflow-diagram.svg');
+
+    // Test LINKS layout + allLinks + global /go/:slug 302 redirect
+    const linkUpsertRes = await fetch(`${base}/api/admin/deck-edit?room=${ctx.defaultRoom}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({
+        roomId: ctx.defaultRoom,
+        op: 'upsert',
+        afterIndex: 0,
+        jumpToNew: true,
+        slideData: {
+          mode: 'SLIDE',
+          layout: 'LINKS',
+          title: 'GAS 實作安裝網址',
+          body: 'STEP 01 | GAS 試算表範本 | https://script.google.com/home/projects/demo-long-id/edit | 點開後按建立副本 | gasdemo',
+        },
+      }),
+    });
+    assert.equal(linkUpsertRes.status, 200);
+    const mainMobileState = await (await fetch(`${base}/api/state?room=${ctx.defaultRoom}`)).json();
+    assert.equal(mainMobileState.layout, 'LINKS');
+    assert.equal(mainMobileState.linksSpec.links[0].slug, 'gasdemo');
+    assert.ok(mainMobileState.allLinks.some((l) => l.slug === 'gasdemo'));
+
+    const goRes = await fetch(`${base}/go/gasdemo`, { redirect: 'manual' });
+    assert.equal(goRes.status, 302);
+    assert.equal(goRes.headers.get('location'), 'https://script.google.com/home/projects/demo-long-id/edit');
+    const apiGoRes = await fetch(`${base}/api/go?slug=gasdemo`, { redirect: 'manual' });
+    assert.equal(apiGoRes.status, 302);
+    assert.equal(apiGoRes.headers.get('location'), 'https://script.google.com/home/projects/demo-long-id/edit');
+    const missGoRes = await fetch(`${base}/go/not-exists-slug`);
+    assert.equal(missGoRes.status, 404);
 
     // Verify Vercel serverless entrypoint works cleanly
     const mockServer = http.createServer((req, res) => vercelHandler(req, res));

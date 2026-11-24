@@ -88,6 +88,7 @@ a{color:var(--sky)}
       </div>
       <div class="row">
         <a id="stageLink" href="/" target="_blank"><button class="sky">🖥 開啟大螢幕 (/)</button></a>
+        <a id="pcLink" href="/pc" target="_blank"><button class="ghost">💻 筆電入口 (/pc)</button></a>
         <a id="mobileLink" href="/m" target="_blank"><button class="ghost">📱 預覽手機端 (/m)</button></a>
         <button id="remoteQrBtn" class="ghost">📲 講者手機遙控 QR</button>
       </div>
@@ -227,6 +228,7 @@ a{color:var(--sky)}
             <h3 style="margin:0">📑 視覺化講題編排器（點擊切換・可插題與配圖）</h3>
             <div class="row">
               <button id="addSlideBtn" class="ghost xs">➕ 新增簡報頁</button>
+              <button id="addLinksBtn" class="ghost xs">🔗 插入實作網址頁</button>
               <button id="addInterBtn" class="sky xs">➕ 插入互動題</button>
             </div>
           </div>
@@ -277,6 +279,7 @@ a{color:var(--sky)}
           <option value="QUOTE">QUOTE（金句引言，| 分中英對照）</option>
           <option value="MEDIA">MEDIA（全幅圖片 / PDF 投影頁）</option>
           <option value="CARDS">CARDS（流程卡片）</option>
+          <option value="LINKS">LINKS（實作網址分享 / 筆電 /pc 傳送門）</option>
           <option value="CHART">CHART（數據圖表）</option>
           <option value="DIAGRAM">DIAGRAM（Mermaid 流程圖）</option>
         </select>
@@ -287,11 +290,21 @@ a{color:var(--sky)}
     <div class="field"><label>副標題 / 作答說明 (subtitle)</label><input id="edSubtitle" type="text"></div>
 
     <div id="edSlideFields">
-      <div class="field">
+      <div id="edBodyWrap" class="field">
         <label>內文 (body) — 條列用 <code>|</code> 分隔，雙欄對比用 <code>::</code> 分左右欄</label>
         <textarea id="edBody" rows="3"></textarea>
       </div>
-      <div class="card" style="background:#0c1426;margin-bottom:12px">
+      <div id="edLinksWrap" class="card" style="display:none;background:#0c1426;margin-bottom:12px">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <div>
+            <strong style="font-size:13px">🔗 實作網址分享清單（筆電開啟 <code>/pc</code> 同步一鍵點擊 + 產生 <code>/go/短碼</code>）</strong>
+            <div class="muted" style="font-size:12px">支援超長 GAS / Google 表單 / 網頁連結；貼入 Google 檔案時可點「轉 /copy」強制老師建立副本。</div>
+          </div>
+          <button type="button" id="edAddLinkRowBtn" class="sky xs">➕ 增加連結卡片</button>
+        </div>
+        <div id="edLinksList" style="display:flex;flex-direction:column;gap:10px"></div>
+      </div>
+      <div id="edImgCardWrap" class="card" style="background:#0c1426;margin-bottom:12px">
         <div class="row" style="justify-content:space-between;margin-bottom:8px">
           <strong style="font-size:13px">🖼 本頁插圖 / 簡報圖檔設定</strong>
           <div class="row">
@@ -482,6 +495,7 @@ async function setupLinks(remoteToken) {
     } catch {}
   }
   $('stageLink').href = `/?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(remoteToken || '')}`;
+  $('pcLink').href = `/pc${roomId && roomId !== 'main' ? '?room=' + encodeURIComponent(roomId) : ''}`;
   $('mobileLink').href = `/m?room=${encodeURIComponent(roomId)}`;
   const remoteUrl = `${baseUrl}/remote?room=${encodeURIComponent(roomId)}&token=${encodeURIComponent(remoteToken || '')}`;
   $('remoteQrImg').src = `/api/qr.svg?url=${encodeURIComponent(remoteUrl)}`;
@@ -873,17 +887,70 @@ $('saveThemeBtn').onclick = async () => {
 };
 
 // ---------- 視覺化講題編輯器 ----------
+let edLinksData = [];
+function renderEdLinksList() {
+  const box = $('edLinksList');
+  if (!edLinksData.length) {
+    box.innerHTML = '<div class="muted">尚未新增連結，請點右上方「➕ 增加連結卡片」。</div>';
+    return;
+  }
+  box.innerHTML = edLinksData.map((lk, i) => `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:10px 12px;background:#091020">
+      <div class="row" style="justify-content:space-between;margin-bottom:8px">
+        <strong style="font-size:12px;color:var(--sky)">連結卡片 #${i + 1}</strong>
+        <button type="button" class="ghost xs" onclick="removeEdLinkRow(${i})">🗑 移除</button>
+      </div>
+      <div class="grid-2" style="gap:8px;margin-bottom:8px">
+        <div><label style="font-size:11px;color:var(--muted)">步驟標籤</label><input type="text" data-lk="${i}" data-f="tag" value="${esc(lk.tag || '')}" placeholder="STEP 0${i + 1}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">短網址代碼（可自訂，如 gas1 ➔ /go/gas1）</label><input type="text" data-lk="${i}" data-f="slug" value="${esc(lk.slug || '')}" placeholder="gas${i + 1}"></div>
+      </div>
+      <div class="field" style="margin-bottom:8px"><label>資源名稱 / 標題</label><input type="text" data-lk="${i}" data-f="title" value="${esc(lk.title || '')}" placeholder="例：GAS 成績自動寄送試算表範本"></div>
+      <div class="field" style="margin-bottom:8px">
+        <div class="row" style="justify-content:space-between;margin-bottom:4px">
+          <label style="margin:0">超長目標網址 (https://...)</label>
+          <button type="button" class="ghost xs" onclick="convertLkToCopy(${i})" title="將 Google Docs/Sheets/Slides 的 /edit 轉為 /copy">✨ /edit ➔ /copy</button>
+        </div>
+        <input type="text" data-lk="${i}" data-f="url" value="${esc(lk.url || '')}" placeholder="https://docs.google.com/... 或 https://script.google.com/...">
+      </div>
+      <div><label style="font-size:11px;color:var(--muted)">實作提醒說明（顯示於大螢幕與筆電按鈕上方）</label><input type="text" data-lk="${i}" data-f="desc" value="${esc(lk.desc || '')}" placeholder="例：開啟後按「建立副本」，再點上方「擴充功能 → Apps Script」"></div>
+    </div>
+  `).join('');
+  box.querySelectorAll('input[data-lk]').forEach(inp => {
+    inp.oninput = () => {
+      const idx = Number(inp.dataset.lk);
+      if (edLinksData[idx]) edLinksData[idx][inp.dataset.f] = inp.value;
+    };
+  });
+}
+function removeEdLinkRow(i) { edLinksData.splice(i, 1); renderEdLinksList(); }
+function convertLkToCopy(i) {
+  const cur = (edLinksData[i]?.url || '').trim();
+  if (!cur) return;
+  edLinksData[i].url = cur.replace(/\/(edit|view)(?:[?#].*)?$/i, '/copy');
+  renderEdLinksList();
+}
+$('edAddLinkRowBtn').onclick = () => {
+  edLinksData.push({ tag: `STEP ${String(edLinksData.length + 1).padStart(2, '0')}`, title: '', url: '', desc: '', slug: '' });
+  renderEdLinksList();
+};
+
 function syncEditorVisibility() {
   const mode = $('edMode').value;
+  const layout = $('edLayout').value;
   const isSlide = mode === 'SLIDE';
+  const isLinks = isSlide && layout === 'LINKS';
   $('edLayoutWrap').style.display = isSlide ? 'block' : 'none';
   $('edSlideFields').style.display = isSlide ? 'block' : 'none';
+  $('edBodyWrap').style.display = isLinks ? 'none' : 'block';
+  $('edLinksWrap').style.display = isLinks ? 'block' : 'none';
+  $('edImgCardWrap').style.display = isLinks ? 'none' : 'block';
   $('edInterFields').style.display = isSlide ? 'none' : 'block';
   const isMyth = mode === 'MYTH';
   $('edMythExtra').style.display = isMyth ? 'grid' : 'none';
   $('edMythExpWrap').style.display = isMyth ? 'block' : 'none';
 }
 $('edMode').onchange = syncEditorVisibility;
+$('edLayout').onchange = syncEditorVisibility;
 
 function refreshEdImgPreview() {
   const u = $('edMediaUrl').value.trim();
@@ -927,16 +994,20 @@ $('edAiGenBtn').onclick = async () => {
   $('edAiGenBtn').disabled = false;
 };
 
-function openEditor({ replaceIndex = null, afterIndex = null, presetMode = 'SLIDE' }) {
+function openEditor({ replaceIndex = null, afterIndex = null, presetMode = 'SLIDE', presetLayout = 'BULLETS' }) {
   editCtx = { replaceIndex, afterIndex };
   const item = replaceIndex !== null ? state.deckList[replaceIndex] : null;
-  $('editorTitle').textContent = item ? `✏️ 編輯第 ${item.order} 頁` : (presetMode === 'SLIDE' ? '➕ 新增簡報頁面' : '➕ 插入互動題目');
+  $('editorTitle').textContent = item ? `✏️ 編輯第 ${item.order} 頁` : (presetMode === 'SLIDE' ? (presetLayout === 'LINKS' ? '🔗 插入實作網址分享頁' : '➕ 新增簡報頁面') : '➕ 插入互動題目');
 
   $('edMode').value = item ? item.mode : presetMode;
-  $('edLayout').value = item ? (item.layout || 'BULLETS') : 'BULLETS';
-  $('edTitle').value = item ? item.title : '';
-  $('edSubtitle').value = item ? (item.subtitle || '') : '';
+  $('edLayout').value = item ? (item.layout || 'BULLETS') : presetLayout;
+  $('edTitle').value = item ? item.title : (presetLayout === 'LINKS' ? '實作資源與系統網址' : '');
+  $('edSubtitle').value = item ? (item.subtitle || '') : (presetLayout === 'LINKS' ? '請用筆電開啟 /pc 或直接輸入短網址，依序完成安裝部署' : '');
   $('edBody').value = item ? (item.body || '') : '';
+  edLinksData = item?.linksSpec?.links?.length
+    ? item.linksSpec.links.map(l => ({ ...l }))
+    : [{ tag: 'STEP 01', title: '', url: '', desc: '', slug: 'gas1' }];
+  renderEdLinksList();
   $('edImgPrompt').value = item ? (item.imagePrompt || '') : '';
   $('edMediaUrl').value = item ? (item.mediaUrl || '') : '';
   const opts = item?.options || [];
@@ -956,17 +1027,27 @@ function openEditor({ replaceIndex = null, afterIndex = null, presetMode = 'SLID
 }
 function closeEditor() { $('editorModal').classList.remove('show'); }
 
-$('addSlideBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'SLIDE' });
+$('addSlideBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'SLIDE', presetLayout: 'BULLETS' });
+$('addLinksBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'SLIDE', presetLayout: 'LINKS' });
 $('addInterBtn').onclick = () => openEditor({ afterIndex: state?.idx ?? 0, presetMode: 'BUBBLE' });
 
 $('edSaveBtn').onclick = async () => {
   const mode = $('edMode').value;
+  const layout = mode === 'SLIDE' ? $('edLayout').value : '';
+  let bodyVal = $('edBody').value;
+  if (mode === 'SLIDE' && layout === 'LINKS') {
+    const cleanField = (v) => String(v || '').replace(/\|/g, ' ').replace(/::/g, ' ').trim();
+    bodyVal = edLinksData
+      .filter(l => (l.url || '').trim() || (l.title || '').trim())
+      .map(l => [cleanField(l.tag), cleanField(l.title), String(l.url || '').trim(), cleanField(l.desc), cleanField(l.slug)].join(' | '))
+      .join(' :: ');
+  }
   const slideData = {
     mode,
-    layout: mode === 'SLIDE' ? $('edLayout').value : '',
+    layout,
     title: $('edTitle').value.trim() || '未命名頁面',
     subtitle: $('edSubtitle').value.trim(),
-    body: $('edBody').value,
+    body: bodyVal,
     mediaUrl: $('edMediaUrl').value.trim(),
     imagePrompt: $('edImgPrompt').value.trim(),
     opt_1: $('edOpt1').value.trim(),
