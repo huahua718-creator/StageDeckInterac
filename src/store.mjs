@@ -1,4 +1,4 @@
-import { buildSlideObject, DEFAULT_CONFIG, extractDeckLinks, loadDeckPackage, sanitizeConfig, sanitizeLinkSlug } from './sheets.mjs';
+import { buildSlideObject, DEFAULT_CONFIG, extractDeckLinks, listPresets, loadDeckPackage, loadPreset, sanitizeConfig, sanitizeLinkSlug } from './sheets.mjs';
 
 const BAD_WORDS = [
   '幹你娘', '靠北', '靠腰', '白痴', '智障', '垃圾', '去死', 'fuck', 'shit', 'bitch', 'asshole',
@@ -240,9 +240,10 @@ function mapAdminDeckList(deck) {
  * In-memory multi-room store (used locally or on persistent Node.js hosts with SSE).
  */
 export class MemoryRoomStore {
-  constructor(defaultPackage) {
+  constructor(defaultPackage, presetMap = {}) {
     this.kind = 'memory';
     this.defaultPackage = defaultPackage;
+    this.presetMap = presetMap;
     this.rooms = new Map();
     this.listeners = new Map(); // roomId -> Set<fn>
   }
@@ -269,7 +270,7 @@ export class MemoryRoomStore {
   _ensureRoom(roomId) {
     const id = sanitizeRoomId(roomId);
     if (this.rooms.has(id)) return this.rooms.get(id);
-    const pkg = this.defaultPackage;
+    const pkg = id !== 'main' && this.presetMap[id] ? this.presetMap[id] : this.defaultPackage;
     const firstSlide = pkg.deck[0] || null;
     const room = {
       roomId: id,
@@ -792,7 +793,7 @@ export class UpstashRedisRoomStore {
     this.defaultPackage = defaultPackage;
     this.url = url.replace(/\/+$/, '');
     this.token = token;
-    this.roomTtlSec = 60 * 60 * 24; // 24 hours
+    this.roomTtlSec = 60 * 60 * 24 * 30; // 30 days
   }
 
   subscribe() {
@@ -890,14 +891,22 @@ export class UpstashRedisRoomStore {
       };
     }
 
+    let basePkg = this.defaultPackage;
+    if (k.roomId !== 'main' && listPresets().some((p) => p.id === k.roomId)) {
+      try {
+        basePkg = await loadPreset(k.roomId);
+      } catch {
+        basePkg = this.defaultPackage;
+      }
+    }
     const pkg = {
-      config: sanitizeConfig(this.defaultPackage.config),
-      deck: this.defaultPackage.deck,
-      builtInHash: this.defaultPackage.builtInHash || '',
-      source: this.defaultPackage.source,
-      configSource: this.defaultPackage.configSource || '',
-      deckUrl: this.defaultPackage.deckUrl || '',
-      configUrl: this.defaultPackage.configUrl || '',
+      config: sanitizeConfig(basePkg.config),
+      deck: basePkg.deck,
+      builtInHash: basePkg.builtInHash || '',
+      source: basePkg.source,
+      configSource: basePkg.configSource || '',
+      deckUrl: basePkg.deckUrl || '',
+      configUrl: basePkg.configUrl || '',
       explicitSheetLock: false,
     };
     const firstSlide = pkg.deck[0] || null;
@@ -1525,11 +1534,11 @@ export class UpstashRedisRoomStore {
   }
 }
 
-export function createRoomStore(defaultPackage) {
+export function createRoomStore(defaultPackage, presetMap = {}) {
   const redisUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || '';
   const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || '';
   if (redisUrl && redisToken) {
     return new UpstashRedisRoomStore(defaultPackage, { url: redisUrl, token: redisToken });
   }
-  return new MemoryRoomStore(defaultPackage);
+  return new MemoryRoomStore(defaultPackage, presetMap);
 }

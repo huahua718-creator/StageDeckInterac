@@ -102,7 +102,17 @@ export async function createAppContext() {
     defaultPackage = await loadDeckPackage({});
   }
 
-  const store = createRoomStore(defaultPackage);
+  const presetMap = {};
+  for (const p of listPresets()) {
+    if (p.id === 'default') continue;
+    try {
+      presetMap[p.id] = await loadPreset(p.id);
+    } catch {
+      // Ignore optional broken preset
+    }
+  }
+
+  const store = createRoomStore(defaultPackage, presetMap);
 
   // Cache HTML pages in memory for fast serving (local/persistent Node; Vercel serves public/ directly)
   const htmlCache = {};

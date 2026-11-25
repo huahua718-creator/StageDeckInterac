@@ -885,7 +885,7 @@ export async function loadDeckPackage({ deckUrl = '', configUrl = '' } = {}) {
     config,
     deck,
     builtInHash,
-    source: 'sample-deck.csv (用 AI 改善工作流 18 頁研習版)',
+    source: 'sample-deck.csv (全模式展示範本 15 頁)',
     configSource: 'sample-config.csv',
     deckUrl: '',
     configUrl: '',
@@ -910,7 +910,8 @@ export function loadDeckFromCsvTexts({ deckCsv, configCsv = '', sourceLabel = '�
 }
 
 const PRESET_LABELS = {
-  default: '用 AI 改善工作流──邁向優雅的教師生活（18頁研習版）',
+  default: '全模式展示範本（6大互動 × 9種簡報版型，共15頁）',
+  lecture: '用 AI 改善工作流 — 教師研習完整講座版（含實作工作流，24頁）',
   'parent-orientation': '115 學年度新生入學說明會（淺色主題範例）',
 };
 

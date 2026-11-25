@@ -49,14 +49,23 @@ async function runTests() {
     'https://drive.google.com/uc?export=download&id=1DriveFile'
   );
 
-  console.log('2. Testing 18-slide workshop package, presets & CSV/JSON export...');
+  console.log('2. Testing 15-slide showcase package (6 modes + 9 layouts), lecture preset & CSV/JSON export...');
   const pkg = await loadDeckPackage({});
-  assert.equal(pkg.deck.length, 18, 'Default workshop deck should have 18 slides');
+  assert.equal(pkg.deck.length, 15, 'Default showcase deck should have 15 slides');
+  for (const mode of ['QUADRANT', 'BUBBLE', 'MYTH', 'SPECTRUM', 'TREE', 'DANMAKU']) {
+    assert.ok(pkg.deck.some((s) => s.mode === mode), `Showcase deck should include mode ${mode}`);
+  }
+  for (const layout of ['COVER', 'QUOTE', 'BULLETS', 'SPLIT', 'MEDIA', 'DIAGRAM', 'CHART', 'CARDS', 'LINKS']) {
+    assert.ok(pkg.deck.some((s) => s.mode === 'SLIDE' && s.layout === layout), `Showcase deck should include layout ${layout}`);
+  }
   assert.equal(pkg.config.primary_color, '#6366f1');
   assert.equal(pkg.config.event_subtitle, '高中教師增能研習工作坊');
 
   const presets = listPresets();
   assert.ok(presets.some((p) => p.id === 'parent-orientation'));
+  assert.ok(presets.some((p) => p.id === 'lecture'));
+  const lecPkg = await loadPreset('lecture');
+  assert.equal(lecPkg.deck.length, 24);
   const parentPkg = await loadPreset('parent-orientation');
   assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
   assert.equal(parentPkg.deck.length, 5);
@@ -138,7 +147,7 @@ async function runTests() {
   await store.nextStep('roomA');
   const mobAfter = await store.getMobileState('roomA');
   assert.equal(mobAfter.phase, 'REVEALED');
-  assert.equal(mobAfter.correctOpt, 'opt_3');
+  assert.equal(mobAfter.correctOpt, 'opt_2');
 
   console.log('4. Testing DANMAKU profanity filter & mobile payload budget (< 80 KB)...');
   const dmIdx = customPkg.deck.findIndex((s) => s.mode === 'DANMAKU');
@@ -178,6 +187,11 @@ async function runTests() {
     const stateJson = await stateRes.json();
     assert.equal(stateJson.roomId, 'testroom');
     assert.equal(stateJson.speakerNote, undefined); // never exposed to mobile!
+
+    const lectureRes = await fetch(`${base}/api/state?room=lecture`);
+    assert.equal(lectureRes.status, 200);
+    const lectureJson = await lectureRes.json();
+    assert.equal(lectureJson.total, 24);
 
     // Test admin login + goto + all interactive modes + stage hotkey control
     const loginRes = await fetch(`${base}/api/admin/login?room=testroom`, {
