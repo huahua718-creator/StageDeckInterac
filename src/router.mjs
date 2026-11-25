@@ -429,8 +429,17 @@ export async function createAppContext() {
           remoteToken,
           hasServerGeminiKey: Boolean(process.env.GEMINI_API_KEY),
           hasBlobStorage: Boolean(process.env.BLOB_READ_WRITE_TOKEN),
+          rooms: await store.listRooms(),
           state: await store.getAdminState(targetRoom),
         });
+      }
+
+      // Admin Rooms List
+      if (req.method === 'GET' && pathname === '/api/admin/rooms') {
+        if (!isAuthorized(req, null)) {
+          return sendJson(res, 401, { ok: false, message: '未授權' });
+        }
+        return sendJson(res, 200, { ok: true, rooms: await store.listRooms() });
       }
 
       // Admin State

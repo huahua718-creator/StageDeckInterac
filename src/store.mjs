@@ -782,6 +782,20 @@ export class MemoryRoomStore {
     this._notify(room.roomId, 'deck');
     return room;
   }
+
+  async listRooms() {
+    const presetIds = listPresets().filter((p) => p.id !== 'default').map((p) => p.id);
+    const ids = Array.from(new Set(['main', ...presetIds, ...this.rooms.keys()]));
+    return ids.slice(0, 30).map((id) => {
+      const r = this._ensureRoom(id);
+      return {
+        roomId: id,
+        title: r.config?.event_title || id,
+        total: r.deck?.length || 0,
+        isPreset: id === 'main' || presetIds.includes(id),
+      };
+    });
+  }
 }
 
 /**
@@ -1533,6 +1547,47 @@ export class UpstashRedisRoomStore {
       ['SET', k.session, JSON.stringify(state.session), 'EX', this.roomTtlSec],
     ]);
     return state;
+  }
+
+  async listRooms() {
+    const presetIds = listPresets().filter((p) => p.id !== 'default').map((p) => p.id);
+    const activeIds = [];
+    try {
+      const scanRes = await this._cmd(['SCAN', '0', 'MATCH', 'sdi:*:pkg', 'COUNT', '100']);
+      const keys = Array.isArray(scanRes) ? (scanRes[1] || []) : [];
+      for (const key of keys) {
+        const m = String(key).match(/^sdi:([^:]+):pkg$/);
+        if (m) activeIds.push(m[1]);
+      }
+    } catch {
+      // Fallback to built-in rooms if SCAN fails
+    }
+    const ids = Array.from(new Set(['main', ...presetIds, ...activeIds])).slice(0, 24);
+    const raws = await this._pipeline(ids.map((id) => ['GET', this._keys(id).pkg]));
+    const out = [];
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      let title = id;
+      let total = 0;
+      if (raws[i]) {
+        try {
+          const p = JSON.parse(raws[i]);
+          title = p.config?.event_title || id;
+          total = p.deck?.length || 0;
+        } catch {}
+      } else if (id === 'main') {
+        title = this.defaultPackage.config?.event_title || 'main';
+        total = this.defaultPackage.deck?.length || 0;
+      } else if (presetIds.includes(id)) {
+        try {
+          const lp = await loadPreset(id);
+          title = lp.config?.event_title || id;
+          total = lp.deck?.length || 0;
+        } catch {}
+      }
+      out.push({ roomId: id, title, total, isPreset: id === 'main' || presetIds.includes(id) });
+    }
+    return out;
   }
 }
 

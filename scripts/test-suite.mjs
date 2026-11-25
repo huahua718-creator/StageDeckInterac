@@ -204,6 +204,14 @@ async function runTests() {
     assert.equal(loginRes.status, 200);
     const loginJson = await loginRes.json();
     assert.ok(loginJson.state.speakerNote.length > 0);
+    assert.ok(Array.isArray(loginJson.rooms) && loginJson.rooms.some((r) => r.roomId === 'lecture'));
+
+    const roomsRes = await fetch(`${base}/api/admin/rooms`, {
+      headers: { 'x-admin-password': ctx.adminPassword },
+    });
+    assert.equal(roomsRes.status, 200);
+    const roomsJson = await roomsRes.json();
+    assert.ok(roomsJson.rooms.some((r) => r.roomId === 'parent-orientation'));
 
     for (const mode of ['QUADRANT', 'BUBBLE', 'SPECTRUM', 'TREE']) {
       const idx = pkg.deck.findIndex((s) => s.mode === mode);
