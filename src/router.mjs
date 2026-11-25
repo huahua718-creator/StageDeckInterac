@@ -311,7 +311,10 @@ export async function createAppContext() {
         const mobileState = await store.getMobileState(roomId);
         const sse = store.kind === 'memory' && !isVercel;
         const cacheHeaders = isVercel
-          ? { 'Cache-Control': 'public, s-maxage=2, stale-while-revalidate=2' }
+          ? {
+              'Cache-Control': 'public, max-age=1, s-maxage=2, stale-while-revalidate=2',
+              'CDN-Cache-Control': 'public, s-maxage=2, stale-while-revalidate=2',
+            }
           : { 'Cache-Control': 'no-store' };
         return sendJson(res, 200, { ...mobileState, sse, pollMs: isVercel ? 3000 : 1500 }, cacheHeaders);
       }

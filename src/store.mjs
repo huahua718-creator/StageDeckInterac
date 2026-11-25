@@ -855,10 +855,12 @@ export class UpstashRedisRoomStore {
       ['GET', k.session],
     ]);
 
+    const isPresetRoom = k.roomId !== 'main' && listPresets().some((p) => p.id === k.roomId);
     if (rawPkg && rawSession) {
       const parsedPkg = JSON.parse(rawPkg);
       const parsedSession = JSON.parse(rawSession);
       if (
+        !isPresetRoom &&
         !parsedPkg.explicitSheetLock &&
         this.defaultPackage.builtInHash &&
         parsedPkg.builtInHash !== this.defaultPackage.builtInHash
@@ -892,7 +894,7 @@ export class UpstashRedisRoomStore {
     }
 
     let basePkg = this.defaultPackage;
-    if (k.roomId !== 'main' && listPresets().some((p) => p.id === k.roomId)) {
+    if (isPresetRoom) {
       try {
         basePkg = await loadPreset(k.roomId);
       } catch {
