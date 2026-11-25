@@ -1371,6 +1371,10 @@ function enableOfflineFallback() {
 
 function startSync() {
   fetchStageState(true).then(() => {
+    if (state && (state.isVercel || state.storageKind !== 'memory')) {
+      if (!pollTimer) pollTimer = setInterval(() => fetchStageState(false), 1000);
+      return;
+    }
     const es = new EventSource(`/api/stream/stage?room=${encodeURIComponent(roomId)}`);
     es.onmessage = (e) => {
       try { applyState(JSON.parse(e.data)); } catch {}

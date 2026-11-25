@@ -255,10 +255,10 @@ export async function createAppContext() {
           const ext = path.extname(filePath).toLowerCase();
           const mime =
             ext === '.svg' ? 'image/svg+xml' :
-            ext === '.png' ? 'image/png' :
-            ext === '.webp' ? 'image/webp' :
-            (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg' :
-            'application/octet-stream';
+              ext === '.png' ? 'image/png' :
+                ext === '.webp' ? 'image/webp' :
+                  (ext === '.jpg' || ext === '.jpeg') ? 'image/jpeg' :
+                    'application/octet-stream';
           res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': 'public, max-age=3600' });
           res.end(fs.readFileSync(filePath));
           return;
@@ -306,13 +306,14 @@ export async function createAppContext() {
         });
       }
 
-      // Mobile state (CDN s-maxage=1 on Vercel absorbs 3,000 concurrent phones!)
+      // Mobile state (CDN s-maxage=2 on Vercel absorbs 1,000~3,000 concurrent phones!)
       if (req.method === 'GET' && pathname === '/api/state') {
         const mobileState = await store.getMobileState(roomId);
+        const sse = store.kind === 'memory' && !isVercel;
         const cacheHeaders = isVercel
-          ? { 'Cache-Control': 'public, s-maxage=1, stale-while-revalidate=1' }
+          ? { 'Cache-Control': 'public, s-maxage=2, stale-while-revalidate=2' }
           : { 'Cache-Control': 'no-store' };
-        return sendJson(res, 200, mobileState, cacheHeaders);
+        return sendJson(res, 200, { ...mobileState, sse, pollMs: isVercel ? 3000 : 1500 }, cacheHeaders);
       }
 
       // Presets listing

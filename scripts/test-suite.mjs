@@ -186,6 +186,8 @@ async function runTests() {
     assert.equal(stateRes.status, 200);
     const stateJson = await stateRes.json();
     assert.equal(stateJson.roomId, 'testroom');
+    assert.equal(typeof stateJson.sse, 'boolean');
+    assert.equal(typeof stateJson.pollMs, 'number');
     assert.equal(stateJson.speakerNote, undefined); // never exposed to mobile!
 
     const lectureRes = await fetch(`${base}/api/state?room=lecture`);
@@ -325,6 +327,38 @@ async function runTests() {
     assert.equal(apiGoRes.headers.get('location'), 'https://script.google.com/home/projects/demo-long-id/edit');
     const missGoRes = await fetch(`${base}/go/not-exists-slug`);
     assert.equal(missGoRes.status, 404);
+
+    // Concurrency burst test: 1,200 simultaneous-style votes across batches on parent-orientation room
+    const poGotoRes = await fetch(`${base}/api/admin/control?room=parent-orientation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-password': ctx.adminPassword },
+      body: JSON.stringify({ roomId: 'parent-orientation', action: 'goto', index: 2 }), // BUBBLE
+    });
+    assert.equal(poGotoRes.status, 200);
+    const poState = (await poGotoRes.json()).state;
+    let burstOk = 0;
+    for (let batch = 0; batch < 12; batch++) {
+      const resList = await Promise.all(
+        Array.from({ length: 100 }, (_, i) => {
+          const idx = batch * 100 + i;
+          return fetch(`${base}/api/vote?room=parent-orientation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roomId: 'parent-orientation',
+              slideId: poState.slideId,
+              order: poState.order,
+              uuid: `po_u_${idx}`,
+              payload: { optKey: `opt_${(idx % 4) + 1}` },
+            }),
+          }).then((r) => r.json());
+        })
+      );
+      burstOk += resList.filter((r) => r.ok).length;
+    }
+    assert.equal(burstOk, 1200, 'All 1,200 parent-orientation votes should succeed');
+    const poFinal = await (await fetch(`${base}/api/stage-state?room=parent-orientation`)).json();
+    assert.equal(poFinal.stats.totalVotes, 1200);
 
     // Verify Vercel serverless entrypoint works cleanly
     const mockServer = http.createServer((req, res) => vercelHandler(req, res));

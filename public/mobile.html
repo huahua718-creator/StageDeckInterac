@@ -666,12 +666,44 @@
     function getVoted(slideId) { try { return JSON.parse(localStorage.getItem('sdi_v_' + roomId + '_' + slideId) || 'null') } catch { return null } }
     function setVoted(slideId, val) { try { localStorage.setItem('sdi_v_' + roomId + '_' + slideId, JSON.stringify(val)) } catch { } }
 
+    async function syncOnce() {
+      try {
+        const r = await fetch('/api/state?room=' + encodeURIComponent(roomId));
+        if (r.ok) {
+          const data = await r.json();
+          connDot.classList.remove('off');
+          applyState(data);
+          return data;
+        }
+      } catch {
+        connDot.classList.add('off');
+      }
+      return null;
+    }
+
     async function postVote(payload) {
-      const res = await fetch('/api/vote?room=' + encodeURIComponent(roomId), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roomId, slideId: state.slideId, order: state.order, uuid, payload })
-      });
-      return res.json();
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch('/api/vote?room=' + encodeURIComponent(roomId), {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roomId, slideId: state.slideId, order: state.order, uuid, payload })
+          });
+          if (res.status >= 500 && attempt === 0) {
+            await new Promise(r => setTimeout(r, 450 + Math.random() * 450));
+            continue;
+          }
+          const data = await res.json();
+          if (data.code === 'STALE_SLIDE') syncOnce();
+          return data;
+        } catch {
+          if (attempt === 0) {
+            await new Promise(r => setTimeout(r, 450 + Math.random() * 450));
+            continue;
+          }
+          return { ok: false, message: '現場連線較忙碌，請再點一次送出！' };
+        }
+      }
+      return { ok: false, message: '送出失敗，請重試' };
     }
 
     function updateTimer() {
@@ -959,22 +991,37 @@
       }
     }
 
-    function startSync() {
-      fetch('/api/state?room=' + encodeURIComponent(roomId)).then(r => r.json()).then(applyState).catch(() => { });
+    let pollMs = 3000;
+    function schedulePoll() {
+      if (pollIv) return;
+      const tick = async () => {
+        pollIv = null;
+        if (!document.hidden) await syncOnce();
+        if (!es) schedulePoll();
+      };
+      const delay = pollMs + Math.floor(Math.random() * 900);
+      pollIv = setTimeout(tick, delay);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && !es) syncOnce();
+    });
+
+    async function startSync() {
+      const initial = await syncOnce();
+      if (initial && typeof initial.pollMs === 'number') pollMs = initial.pollMs;
+      if (initial && initial.sse === false) {
+        schedulePoll();
+        return;
+      }
       es = new EventSource('/api/stream/mobile?room=' + encodeURIComponent(roomId));
-      es.onopen = () => { connDot.classList.remove('off'); if (pollIv) { clearInterval(pollIv); pollIv = null; } };
+      es.onopen = () => { connDot.classList.remove('off'); if (pollIv) { clearTimeout(pollIv); pollIv = null; } };
       es.onmessage = e => { try { applyState(JSON.parse(e.data)); } catch { } };
       es.onerror = () => {
         es.close();
+        es = null;
         connDot.classList.add('off');
-        if (!pollIv) {
-          pollIv = setInterval(async () => {
-            try {
-              const r = await fetch('/api/state?room=' + encodeURIComponent(roomId));
-              if (r.ok) { connDot.classList.remove('off'); applyState(await r.json()); }
-            } catch { connDot.classList.add('off'); }
-          }, 1500);
-        }
+        schedulePoll();
       };
     }
     setInterval(updateTimer, 500);
