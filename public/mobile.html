@@ -637,12 +637,10 @@
       const dm = getDoneMap();
       return `<div class="links-grid">${links.map(lk => {
         const done = Boolean(dm[lk.url]);
-        const shortU = lk.slug ? location.origin + '/go/' + lk.slug : '';
         return `<div class="link-card ${done ? 'done' : ''}">
       ${lk.tag ? `<span class="link-tag">${esc(lk.tag)}</span>` : ''}
       <div style="font-weight:800;font-size:17px">${esc(lk.title)}</div>
       ${lk.desc ? `<div style="font-size:13px;color:var(--muted);line-height:1.5">${esc(lk.desc)}</div>` : ''}
-      ${shortU ? `<div style="font-size:12px;color:var(--muted);word-break:break-all">短網址：<code>${esc(shortU)}</code></div>` : ''}
       ${lk.url ? `<a class="link-go" href="${esc(lk.url)}" target="_blank" rel="noopener noreferrer">🚀 開啟網頁</a>` : ''}
       <div class="link-acts">
         ${lk.url ? `<button type="button" class="link-btn" data-copy="${esc(lk.url)}">📋 複製網址</button>` : ''}

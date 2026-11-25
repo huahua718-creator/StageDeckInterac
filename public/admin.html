@@ -297,7 +297,7 @@ a{color:var(--sky)}
       <div id="edLinksWrap" class="card" style="display:none;background:#0c1426;margin-bottom:12px">
         <div class="row" style="justify-content:space-between;margin-bottom:8px">
           <div>
-            <strong style="font-size:13px">🔗 實作網址分享清單（筆電開啟 <code>/pc</code> 同步一鍵點擊 + 產生 <code>/go/短碼</code>）</strong>
+            <strong style="font-size:13px">🔗 實作網址分享清單（筆電 <code>/pc</code> 一鍵開啟 ＋ 大螢幕自動產生 QR Code）</strong>
             <div class="muted" style="font-size:12px">支援超長 GAS / Google 表單 / 網頁連結；貼入 Google 檔案時可點「轉 /copy」強制老師建立副本。</div>
           </div>
           <button type="button" id="edAddLinkRowBtn" class="sky xs">➕ 增加連結卡片</button>
@@ -902,9 +902,8 @@ function renderEdLinksList() {
       </div>
       <div class="grid-2" style="gap:8px;margin-bottom:8px">
         <div><label style="font-size:11px;color:var(--muted)">步驟標籤</label><input type="text" data-lk="${i}" data-f="tag" value="${esc(lk.tag || '')}" placeholder="STEP 0${i + 1}"></div>
-        <div><label style="font-size:11px;color:var(--muted)">短網址代碼（可自訂，如 gas1 ➔ /go/gas1）</label><input type="text" data-lk="${i}" data-f="slug" value="${esc(lk.slug || '')}" placeholder="gas${i + 1}"></div>
+        <div><label style="font-size:11px;color:var(--muted)">資源名稱 / 標題</label><input type="text" data-lk="${i}" data-f="title" value="${esc(lk.title || '')}" placeholder="例：GAS 成績自動寄送試算表範本"></div>
       </div>
-      <div class="field" style="margin-bottom:8px"><label>資源名稱 / 標題</label><input type="text" data-lk="${i}" data-f="title" value="${esc(lk.title || '')}" placeholder="例：GAS 成績自動寄送試算表範本"></div>
       <div class="field" style="margin-bottom:8px">
         <div class="row" style="justify-content:space-between;margin-bottom:4px">
           <label style="margin:0">超長目標網址 (https://...)</label>
@@ -1002,11 +1001,11 @@ function openEditor({ replaceIndex = null, afterIndex = null, presetMode = 'SLID
   $('edMode').value = item ? item.mode : presetMode;
   $('edLayout').value = item ? (item.layout || 'BULLETS') : presetLayout;
   $('edTitle').value = item ? item.title : (presetLayout === 'LINKS' ? '實作資源與系統網址' : '');
-  $('edSubtitle').value = item ? (item.subtitle || '') : (presetLayout === 'LINKS' ? '請用筆電開啟 /pc 或直接輸入短網址，依序完成安裝部署' : '');
+  $('edSubtitle').value = item ? (item.subtitle || '') : (presetLayout === 'LINKS' ? '請用筆電開啟 /pc 一鍵點開連結，或用手機掃描大螢幕 QR Code' : '');
   $('edBody').value = item ? (item.body || '') : '';
   edLinksData = item?.linksSpec?.links?.length
     ? item.linksSpec.links.map(l => ({ ...l }))
-    : [{ tag: 'STEP 01', title: '', url: '', desc: '', slug: 'gas1' }];
+    : [{ tag: 'STEP 01', title: '', url: '', desc: '', slug: '' }];
   renderEdLinksList();
   $('edImgPrompt').value = item ? (item.imagePrompt || '') : '';
   $('edMediaUrl').value = item ? (item.mediaUrl || '') : '';
