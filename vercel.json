@@ -7,7 +7,7 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.mjs" },
-    { "source": "/go/:slug", "destination": "/api/go?slug=:slug" },
+    { "source": "/go/:slug", "destination": "/api/index.mjs?go_slug=:slug" },
     { "source": "/m", "destination": "/mobile.html" },
     { "source": "/pc", "destination": "/mobile.html" },
     { "source": "/admin", "destination": "/admin.html" },

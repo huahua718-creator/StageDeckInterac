@@ -225,10 +225,11 @@ export async function createAppContext() {
       if (req.method === 'GET' && pathname === '/admin') return sendHtml(req, res, 'admin');
       if (req.method === 'GET' && pathname === '/remote') return sendHtml(req, res, 'remote');
 
-      // Global short-link redirector (/go/:slug or Vercel rewrite /api/go?slug=...)
-      if (req.method === 'GET' && (pathname.startsWith('/go/') || pathname === '/api/go')) {
-        const rawSlug =
-          pathname === '/api/go'
+      // Global short-link redirector (/go/:slug, /api/go?slug=..., or Vercel rewrite ?go_slug=...)
+      if (req.method === 'GET' && (pathname.startsWith('/go/') || pathname === '/api/go' || reqUrl.searchParams.has('go_slug'))) {
+        const rawSlug = reqUrl.searchParams.has('go_slug')
+          ? reqUrl.searchParams.get('go_slug') || ''
+          : pathname === '/api/go'
             ? reqUrl.searchParams.get('slug') || ''
             : decodeURIComponent(pathname.slice(4).split('/')[0] || '');
         const lookupRoom = reqUrl.searchParams.get('room') ? roomId : defaultRoom;
