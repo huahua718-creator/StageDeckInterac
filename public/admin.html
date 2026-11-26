@@ -11,9 +11,16 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:"Noto Sans TC",
 .container{max-width:1240px;margin:0 auto}
 .login-box{max-width:400px;margin:80px auto;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:28px}
 h1,h2,h3{margin:0 0 10px}
-.grid{display:grid;grid-template-columns:1.35fr .95fr;gap:18px}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:18px}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:920px){.grid,.grid-2{grid-template-columns:1fr}}
+@media(max-width:980px){.grid,.grid-2{grid-template-columns:1fr}}
+.pv-grid{display:grid;grid-template-columns:1fr;gap:12px}
+.pv-grid.both{grid-template-columns:1.55fr 1fr;align-items:start}
+@media(max-width:720px){.pv-grid.both{grid-template-columns:1fr}}
+.pv-box{background:#070d1b;border:1px solid var(--border);border-radius:12px;padding:8px}
+.pv-label{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);font-weight:700;margin-bottom:6px}
+.pv-viewport{position:relative;overflow:hidden;border-radius:8px;border:1px solid #1e293b;background:#090f1f}
+.pv-viewport iframe{border:0;transform-origin:top left;display:block}
 .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:18px}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 input[type=text],input[type=password],input[type=number],select,textarea{
@@ -87,10 +94,11 @@ a{color:var(--sky)}
         <span id="sourceInfo" class="muted">載入中...</span>
       </div>
       <div class="row">
-        <a id="stageLink" href="/" target="_blank"><button class="sky">🖥 開啟大螢幕 (/)</button></a>
-        <a id="pcLink" href="/pc" target="_blank"><button class="ghost">💻 筆電入口 (/pc)</button></a>
-        <a id="mobileLink" href="/m" target="_blank"><button class="ghost">📱 預覽手機端 (/m)</button></a>
-        <button id="remoteQrBtn" class="ghost">📲 講者手機遙控 QR</button>
+        <button id="settingsToggleBtn" class="primary">⚙️ 匯入與設定</button>
+        <a id="stageLink" href="/" target="_blank"><button class="sky">🖥 大螢幕 (/)</button></a>
+        <a id="pcLink" href="/pc" target="_blank"><button class="ghost">💻 筆電 (/pc)</button></a>
+        <a id="mobileLink" href="/m" target="_blank"><button class="ghost">📱 手機 (/m)</button></a>
+        <button id="remoteQrBtn" class="ghost">📲 遙控 QR</button>
       </div>
     </div>
 
@@ -122,142 +130,182 @@ a{color:var(--sky)}
       </div>
     </div>
 
-    <!-- 方案一 + 方案二：PDF/圖片簡報匯入 & AI 一鍵產插圖 -->
-    <div class="grid-2">
-      <div class="card">
-        <h3>📄 方案一：匯入 NotebookLM / Canva PDF 簡報或圖片</h3>
-        <p class="muted" style="margin:0 0 10px">將 NotebookLM 做出來的 <b>PDF 簡報</b>或<b>多張圖片</b>直接拖進來，自動切頁上傳至雲端圖床，之後可在任意頁間插入互動題！</p>
-        <div id="pdfDropzone" class="dropzone">
-          <div style="font-weight:800;margin-bottom:4px">點擊選擇或拖曳 <code>.pdf</code> / 多張圖片（PNG、JPG、WebP）</div>
-          <div class="muted">單檔建議 50 頁以內，瀏覽器自動壓縮渲染</div>
-          <input id="pdfFileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp" multiple style="display:none">
-        </div>
-        <div class="row" style="margin-top:10px;justify-content:space-between">
-          <div class="row">
-            <label class="muted"><input type="radio" name="importMode" value="replace" checked> 覆蓋目前簡報</label>
-            <label class="muted"><input type="radio" name="importMode" value="append"> 追加到結尾</label>
+    <!-- 設定與匯入分頁（預設隱藏，點擊頂部「⚙️ 匯入與設定」展開） -->
+    <div id="settingsView" style="display:none">
+      <div class="card" style="padding:12px 18px;border-color:rgba(99,102,241,.45)">
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <strong style="font-size:15px">⚙️ 講座匯入、AI 生圖提示詞與系統設定</strong>
+            <div class="muted" style="font-size:12px">在這裡匯入 PDF／圖片、生成批量生圖提示詞、同步 Google 試算表或切換內建範本</div>
           </div>
-          <span id="pdfStatus" class="muted"></span>
+          <button id="backToControlBtn" class="sky">⬅ 回到主控與預覽</button>
         </div>
-        <div id="pdfProgressBar" class="progress-bar"><div id="pdfProgressFill" class="progress-fill"></div></div>
       </div>
 
-      <div class="card">
-        <h3>🎨 方案二：批量產出繪圖提示詞 → 外部 AI 挑圖 → 批配上傳</h3>
-        <p class="muted" style="margin:0 0 10px">先匯出每頁的提示詞貼給 Gemini / ChatGPT / Canva 生圖並挑選滿意的圖片，再一次拖進來依頁碼自動配對上傳！</p>
-        <div class="row" style="margin-bottom:8px">
-          <select id="artStyleSel" style="flex:1;min-width:170px">
-            <option value="現代扁平向量插畫，線條俐落、發光點綴">現代扁平向量插畫</option>
-            <option value="3D 等距微縮科技場景，柔和光影">3D 等距科技場景</option>
-            <option value="溫暖日系手繪水彩插畫，柔和療癒">溫暖日系手繪插畫</option>
-            <option value="電影感高質感攝影寫實風格">電影感寫實攝影</option>
-          </select>
-          <select id="promptScopeSel" style="max-width:165px">
-            <option value="missing">僅針對缺圖簡報頁</option>
-            <option value="all">全部 SLIDE 簡報頁</option>
-          </select>
-        </div>
-        <div class="row" style="margin-bottom:8px">
-          <button id="genBatchPromptBtn" class="primary">📋 1. 生成批量生圖提示詞</button>
-          <button id="aiPolishPromptsBtn" class="sky">✨ AI 構思生動畫面</button>
-          <button id="themeModalBtn" class="ghost">🎨 主題配色</button>
-        </div>
-        <div id="batchImgDropzone" class="dropzone" style="padding:11px">
-          <div style="font-weight:800;font-size:13px">📤 2. 批量拖曳或選取生好的圖片（如 01.png, 03.png... 自動對齊頁碼）</div>
-          <input id="batchImgInput" type="file" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
-        </div>
-        <div class="row" style="margin-top:8px;justify-content:space-between">
-          <span id="aiStatus" class="muted"></span>
-          <div class="row" style="gap:6px">
-            <input id="geminiKeyInput" type="password" placeholder="選填 GEMINI_API_KEY" style="max-width:165px;padding:6px 10px;font-size:12px">
-            <span id="geminiKeyBadge" class="tag">檢查中</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 進階資料來源：Google Sheets / CSV / 內建範本 -->
-    <div class="card">
-      <div class="row" style="justify-content:space-between;margin-bottom:8px">
-        <h3 style="margin:0">📊 Google Sheets 試算表同步與範本工具</h3>
-        <div class="row">
-          <button id="promptBtn" class="sky xs">✨ 複製 NotebookLM 產 Google Sheets Prompt</button>
-          <a id="exportCsvLink" href="/api/admin/export-csv" target="_blank"><button class="ghost xs">💾 匯出目前講題 (.csv)</button></a>
-        </div>
-      </div>
-      <div class="row" style="margin-bottom:10px">
-        <input id="deckInput" type="text" placeholder="貼上 Google Sheets 發布 CSV 連結（或試算表分享連結）">
-        <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:250px">
-        <button id="syncBtn" class="primary">🔄 熱重載</button>
-      </div>
-      <div class="row" style="padding-top:10px;border-top:1px dashed var(--border)">
-        <select id="presetSelect" style="flex:1;min-width:220px"></select>
-        <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
-        <label class="muted" style="display:flex;align-items:center;gap:6px">
-          匯入 CSV / JSON：<input id="csvFileInput" type="file" accept=".csv,.json" style="max-width:190px;font-size:12px">
-        </label>
-        <button id="uploadCsvBtn" class="ghost">📤 匯入</button>
-      </div>
-      <div class="row" style="justify-content:space-between;margin-top:6px">
-        <span id="syncMsg" class="muted"></span>
-        <span id="shareUrlPreview" class="muted"></span>
-      </div>
-    </div>
-
-    <div class="teleprompter">
-      <div class="row" style="justify-content:space-between">
-        <span class="tag" style="background:rgba(99,102,241,.25);color:#c7d2fe">🎙 講師口白提詞器 (speaker_note)</span>
-        <span id="curSlideMeta" class="tag">--</span>
-      </div>
-      <div id="speakerNoteText" class="note-body">（本頁未填寫講者備忘錄）</div>
-      <div id="nextSlidePreview" class="next-preview">下一頁預告：--</div>
-    </div>
-
-    <div class="grid">
-      <div>
+      <!-- 方案一 + 方案二：PDF/圖片簡報匯入 & AI 一鍵產插圖 -->
+      <div class="grid-2">
         <div class="card">
-          <div class="row" style="justify-content:space-between;margin-bottom:12px">
-            <h3 style="margin:0">🎯 簡報筆狀態機控制</h3>
-            <span id="liveCount" class="tag" style="font-size:14px;color:var(--sky)">已參與 0 人</span>
+          <h3>📄 方案一：匯入 NotebookLM / Canva PDF 簡報或圖片</h3>
+          <p class="muted" style="margin:0 0 10px">將 NotebookLM 做出來的 <b>PDF 簡報</b>或<b>多張圖片</b>直接拖進來，自動切頁上傳至雲端圖床，之後可在任意頁間插入互動題！</p>
+          <div id="pdfDropzone" class="dropzone">
+            <div style="font-weight:800;margin-bottom:4px">點擊選擇或拖曳 <code>.pdf</code> / 多張圖片（PNG、JPG、WebP）</div>
+            <div class="muted">單檔建議 50 頁以內，瀏覽器自動壓縮渲染</div>
+            <input id="pdfFileInput" type="file" accept=".pdf,image/png,image/jpeg,image/webp" multiple style="display:none">
           </div>
-          <div id="curInfo" style="margin-bottom:14px;font-size:16px;font-weight:700">載入中...</div>
-          <div class="row" style="margin-bottom:10px">
-            <button id="prevBtn">⬅ 上一頁</button>
-            <button id="nextBtn" class="primary">下一步 / 下一頁 ➡</button>
-            <button id="qrToggleBtn" class="ghost">📱 切換浮動 QR</button>
-            <button id="burstBtn" class="ghost">⚡ 模擬 30 人湧入</button>
-          </div>
-          <div class="row">
-            <button id="readyBtn" class="ghost">⏳ READY</button>
-            <button id="voteBtn" class="ok">▶ 開放作答 (VOTING)</button>
-            <button id="lockBtn" class="warn">🔒 截止 (LOCKED)</button>
-            <button id="revealBtn" class="sky">✨ 揭曉答案 (REVEALED)</button>
-            <button id="resetBtn" class="bad">🗑 重置本頁</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="row" style="justify-content:space-between;margin-bottom:10px">
-            <h3 style="margin:0">📑 視覺化講題編排器（點擊切換・可插題與配圖）</h3>
+          <div class="row" style="margin-top:10px;justify-content:space-between">
             <div class="row">
-              <button id="addSlideBtn" class="ghost xs">➕ 新增簡報頁</button>
-              <button id="addLinksBtn" class="ghost xs">🔗 插入實作網址頁</button>
-              <button id="addInterBtn" class="sky xs">➕ 插入互動題</button>
+              <label class="muted"><input type="radio" name="importMode" value="replace" checked> 覆蓋目前簡報</label>
+              <label class="muted"><input type="radio" name="importMode" value="append"> 追加到結尾</label>
+            </div>
+            <span id="pdfStatus" class="muted"></span>
+          </div>
+          <div id="pdfProgressBar" class="progress-bar"><div id="pdfProgressFill" class="progress-fill"></div></div>
+        </div>
+
+        <div class="card">
+          <h3>🎨 方案二：批量產出繪圖提示詞 → 外部 AI 挑圖 → 批配上傳</h3>
+          <p class="muted" style="margin:0 0 10px">先匯出每頁的提示詞貼給 Gemini / ChatGPT / Canva 生圖並挑選滿意的圖片，再一次拖進來依頁碼自動配對上傳！</p>
+          <div class="row" style="margin-bottom:8px">
+            <select id="artStyleSel" style="flex:1;min-width:170px">
+              <option value="現代扁平向量插畫，線條俐落、發光點綴">現代扁平向量插畫</option>
+              <option value="3D 等距微縮科技場景，柔和光影">3D 等距科技場景</option>
+              <option value="溫暖日系手繪水彩插畫，柔和療癒">溫暖日系手繪插畫</option>
+              <option value="電影感高質感攝影寫實風格">電影感寫實攝影</option>
+            </select>
+            <select id="promptScopeSel" style="max-width:165px">
+              <option value="missing">僅針對缺圖簡報頁</option>
+              <option value="all">全部 SLIDE 簡報頁</option>
+            </select>
+          </div>
+          <div class="row" style="margin-bottom:8px">
+            <button id="genBatchPromptBtn" class="primary">📋 1. 生成批量生圖提示詞</button>
+            <button id="aiPolishPromptsBtn" class="sky">✨ AI 構思生動畫面</button>
+            <button id="themeModalBtn" class="ghost">🎨 主題配色</button>
+          </div>
+          <div id="batchImgDropzone" class="dropzone" style="padding:11px">
+            <div style="font-weight:800;font-size:13px">📤 2. 批量拖曳或選取生好的圖片（如 01.png, 03.png... 自動對齊頁碼）</div>
+            <input id="batchImgInput" type="file" accept="image/png,image/jpeg,image/webp" multiple style="display:none">
+          </div>
+          <div class="row" style="margin-top:8px;justify-content:space-between">
+            <span id="aiStatus" class="muted"></span>
+            <div class="row" style="gap:6px">
+              <input id="geminiKeyInput" type="password" placeholder="選填 GEMINI_API_KEY" style="max-width:165px;padding:6px 10px;font-size:12px">
+              <span id="geminiKeyBadge" class="tag">檢查中</span>
             </div>
           </div>
-          <div id="deckList" style="max-height:520px;overflow-y:auto"></div>
         </div>
       </div>
 
-      <div>
-        <div class="card">
-          <div class="row" style="justify-content:space-between;margin-bottom:10px">
-            <h3 style="margin:0">💬 彈幕審核與中央聚焦牆</h3>
-            <button id="clearSpotBtn" class="ghost xs">取消聚焦</button>
+      <!-- 進階資料來源：Google Sheets / CSV / 內建範本 -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between;margin-bottom:8px">
+          <h3 style="margin:0">📊 Google Sheets 試算表同步與範本工具</h3>
+          <div class="row">
+            <button id="promptBtn" class="sky xs">✨ 複製 NotebookLM 產 Google Sheets Prompt</button>
+            <a id="exportCsvLink" href="/api/admin/export-csv" target="_blank"><button class="ghost xs">💾 匯出目前講題 (.csv)</button></a>
           </div>
-          <p class="muted" style="margin:0 0 12px">在 <code>DANMAKU</code> 頁面時，點擊「推上聚焦」可將留言放大顯示於大螢幕正中央。</p>
-          <div id="msgList" style="max-height:560px;overflow-y:auto"></div>
         </div>
+        <div class="row" style="margin-bottom:10px">
+          <input id="deckInput" type="text" placeholder="貼上 Google Sheets 發布 CSV 連結（或試算表分享連結）">
+          <input id="configInput" type="text" placeholder="選填：Config CSV 連結" style="max-width:250px">
+          <button id="syncBtn" class="primary">🔄 熱重載</button>
+        </div>
+        <div class="row" style="padding-top:10px;border-top:1px dashed var(--border)">
+          <select id="presetSelect" style="flex:1;min-width:220px"></select>
+          <button id="presetBtn" class="ghost">🎯 套用內建範本</button>
+          <label class="muted" style="display:flex;align-items:center;gap:6px">
+            匯入 CSV / JSON：<input id="csvFileInput" type="file" accept=".csv,.json" style="max-width:190px;font-size:12px">
+          </label>
+          <button id="uploadCsvBtn" class="ghost">📤 匯入</button>
+        </div>
+        <div class="row" style="justify-content:space-between;margin-top:6px">
+          <span id="syncMsg" class="muted"></span>
+          <span id="shareUrlPreview" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 主控版與即時預覽（預設顯示） -->
+    <div id="controlView">
+      <div class="teleprompter">
+        <div class="row" style="justify-content:space-between">
+          <span class="tag" style="background:rgba(99,102,241,.25);color:#c7d2fe">🎙 講師口白提詞器 (speaker_note)</span>
+          <span id="curSlideMeta" class="tag">--</span>
+        </div>
+        <div id="speakerNoteText" class="note-body">（本頁未填寫講者備忘錄）</div>
+        <div id="nextSlidePreview" class="next-preview">下一頁預告：--</div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <div class="card">
+            <div class="row" style="justify-content:space-between;margin-bottom:12px">
+              <h3 style="margin:0">🎯 簡報筆狀態機控制</h3>
+              <span id="liveCount" class="tag" style="font-size:14px;color:var(--sky)">已參與 0 人</span>
+            </div>
+            <div id="curInfo" style="margin-bottom:14px;font-size:16px;font-weight:700">載入中...</div>
+            <div class="row" style="margin-bottom:10px">
+              <button id="prevBtn">⬅ 上一頁</button>
+              <button id="nextBtn" class="primary">下一步 / 下一頁 ➡</button>
+              <button id="qrToggleBtn" class="ghost">📱 切換浮動 QR</button>
+              <button id="burstBtn" class="ghost">⚡ 模擬 30 人湧入</button>
+            </div>
+            <div class="row">
+              <button id="readyBtn" class="ghost">⏳ READY</button>
+              <button id="voteBtn" class="ok">▶ 開放作答 (VOTING)</button>
+              <button id="lockBtn" class="warn">🔒 截止 (LOCKED)</button>
+              <button id="revealBtn" class="sky">✨ 揭曉答案 (REVEALED)</button>
+              <button id="resetBtn" class="bad">🗑 重置本頁</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between;margin-bottom:10px">
+              <h3 style="margin:0">📑 視覺化講題編排器（點擊切換・即時預覽）</h3>
+              <div class="row">
+                <button id="addSlideBtn" class="ghost xs">➕ 新增簡報頁</button>
+                <button id="addLinksBtn" class="ghost xs">🔗 插入實作網址頁</button>
+                <button id="addInterBtn" class="sky xs">➕ 插入互動題</button>
+              </div>
+            </div>
+            <div id="deckList" style="max-height:520px;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card">
+            <div class="row" style="justify-content:space-between;margin-bottom:10px">
+              <h3 style="margin:0">👁 題目畫面預覽 <span id="pvSlideTag" class="tag">--</span></h3>
+              <div class="row" style="gap:6px">
+                <button type="button" id="pvBtnPc" class="ghost xs" onclick="setPreviewMode('pc')">💻 筆電</button>
+                <button type="button" id="pvBtnMob" class="ghost xs" onclick="setPreviewMode('mobile')">📱 手機</button>
+                <button type="button" id="pvBtnBoth" class="sky xs" onclick="setPreviewMode('both')">💻+📱 兩者</button>
+                <button type="button" id="pvEditCurBtn" class="primary xs">✏️ 修改這題</button>
+              </div>
+            </div>
+            <div id="pvGrid" class="pv-grid both">
+              <div id="pvPcCard" class="pv-box">
+                <div class="pv-label"><span>💻 筆電端 (/pc)</span><span class="muted" style="font-size:11px">寬螢幕視角</span></div>
+                <div id="pvPcViewport" class="pv-viewport"><iframe id="pvPcFrame" width="900" height="560" title="筆電預覽"></iframe></div>
+              </div>
+              <div id="pvMobCard" class="pv-box">
+                <div class="pv-label"><span>📱 手機端 (/m)</span><span class="muted" style="font-size:11px">直立視角</span></div>
+                <div id="pvMobViewport" class="pv-viewport"><iframe id="pvMobFrame" width="390" height="620" title="手機預覽"></iframe></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row" style="justify-content:space-between;margin-bottom:10px">
+              <h3 style="margin:0">💬 彈幕審核與中央聚焦牆</h3>
+              <button id="clearSpotBtn" class="ghost xs">取消聚焦</button>
+            </div>
+            <p class="muted" style="margin:0 0 12px">在 <code>DANMAKU</code> 頁面時，點擊「推上聚焦」可將留言放大顯示於大螢幕正中央。</p>
+            <div id="msgList" style="max-height:280px;overflow-y:auto"></div>
+          </div>
+        </div>
+      </div>
+    </div>
       </div>
     </div>
   </div>
@@ -571,7 +619,121 @@ async function setupLinks(remoteToken) {
     const c = $('remoteCard');
     c.style.display = c.style.display === 'none' ? 'flex' : 'none';
   };
+  ensurePreviewIframes();
 }
+
+let settingsOpen = false;
+function setSettingsOpen(open) {
+  settingsOpen = Boolean(open);
+  $('settingsView').style.display = settingsOpen ? 'block' : 'none';
+  $('controlView').style.display = settingsOpen ? 'none' : 'block';
+  $('settingsToggleBtn').textContent = settingsOpen ? '⬅ 回到主控與預覽' : '⚙️ 匯入與設定';
+  $('settingsToggleBtn').className = settingsOpen ? 'sky' : 'primary';
+  if (!settingsOpen) {
+    setTimeout(() => { resizePreviewFrames(); syncPreviewFrames(); }, 30);
+  }
+}
+$('settingsToggleBtn').onclick = () => setSettingsOpen(!settingsOpen);
+$('backToControlBtn').onclick = () => setSettingsOpen(false);
+
+let pvMode = localStorage.getItem('sdi_pv_mode') || 'both';
+let pvLoadedRoom = '';
+function ensurePreviewIframes() {
+  if (pvLoadedRoom === roomId) return;
+  pvLoadedRoom = roomId;
+  $('pvPcFrame').src = `/pc?room=${encodeURIComponent(roomId)}&preview=1`;
+  $('pvMobFrame').src = `/m?room=${encodeURIComponent(roomId)}&preview=1`;
+}
+
+function setPreviewMode(mode) {
+  pvMode = ['pc', 'mobile', 'both'].includes(mode) ? mode : 'both';
+  try { localStorage.setItem('sdi_pv_mode', pvMode); } catch {}
+  $('pvBtnPc').className = (pvMode === 'pc' ? 'sky' : 'ghost') + ' xs';
+  $('pvBtnMob').className = (pvMode === 'mobile' ? 'sky' : 'ghost') + ' xs';
+  $('pvBtnBoth').className = (pvMode === 'both' ? 'sky' : 'ghost') + ' xs';
+  $('pvPcCard').style.display = pvMode === 'mobile' ? 'none' : 'block';
+  $('pvMobCard').style.display = pvMode === 'pc' ? 'none' : 'block';
+  $('pvGrid').className = pvMode === 'both' ? 'pv-grid both' : 'pv-grid';
+  setTimeout(() => { resizePreviewFrames(); syncPreviewFrames(); }, 20);
+}
+
+function resizePreviewFrames() {
+  if ($('controlView').style.display === 'none') return;
+  if ($('pvPcCard').style.display !== 'none') {
+    const vp = $('pvPcViewport'), fr = $('pvPcFrame');
+    const w = vp.clientWidth;
+    if (w > 40) {
+      const s = Math.min(1, w / 900);
+      fr.style.transform = `scale(${s})`;
+      vp.style.height = `${Math.round(560 * s)}px`;
+    }
+  }
+  if ($('pvMobCard').style.display !== 'none') {
+    const vp = $('pvMobViewport'), fr = $('pvMobFrame');
+    const w = vp.clientWidth;
+    if (w > 40) {
+      const s = Math.min(1, w / 390);
+      fr.style.transform = `scale(${s})`;
+      fr.style.marginLeft = w > 390 * s ? `${Math.round((w - 390 * s) / 2)}px` : '0px';
+      vp.style.height = `${Math.round(620 * s)}px`;
+    }
+  }
+}
+
+function buildPreviewPayload() {
+  if (!state) return null;
+  return {
+    v: state.v,
+    roomId: state.roomId,
+    config: state.config,
+    idx: state.idx,
+    total: state.total,
+    slideId: state.slideId,
+    order: state.order,
+    mode: state.mode,
+    layout: state.layout,
+    title: state.title,
+    subtitle: state.subtitle,
+    body: state.body,
+    bullets: state.bullets,
+    columns: state.columns,
+    diagramCode: state.diagramCode || '',
+    chartSpec: state.chartSpec || null,
+    cardsSpec: state.cardsSpec || null,
+    linksSpec: state.linksSpec || null,
+    allLinks: state.allLinks || [],
+    mediaUrl: state.mediaUrl || '',
+    options: state.options || [],
+    phase: state.phase,
+    subStep: state.subStep || 0,
+    timerEndsAt: state.timerEndsAt || 0,
+    correctOpt: state.correctOpt,
+    explanation: state.explanation,
+  };
+}
+
+function syncPreviewFrames() {
+  const payload = buildPreviewPayload();
+  if (!payload) return;
+  for (const fr of [$('pvPcFrame'), $('pvMobFrame')]) {
+    try {
+      fr.contentWindow?.postMessage({ type: 'sdi_preview_state', state: payload }, location.origin);
+    } catch {}
+  }
+}
+
+window.addEventListener('message', e => {
+  if (e.origin === location.origin && e.data?.type === 'sdi_preview_ready') {
+    syncPreviewFrames();
+    resizePreviewFrames();
+  }
+});
+$('pvPcFrame').onload = syncPreviewFrames;
+$('pvMobFrame').onload = syncPreviewFrames;
+$('pvEditCurBtn').onclick = () => { if (state) openEditor({ replaceIndex: state.idx }); };
+if (window.ResizeObserver) new ResizeObserver(resizePreviewFrames).observe($('pvGrid'));
+window.addEventListener('resize', resizePreviewFrames);
+setPreviewMode(pvMode);
 
 $('loginBtn').onclick = () => tryLogin($('pwdInput').value);
 $('pwdInput').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };
@@ -1227,6 +1389,7 @@ function render() {
 
   $('liveCount').textContent = `已參與 ${state.stats?.totalVotes || 0} 人`;
   $('curSlideMeta').textContent = `#${state.order} · ${state.mode}${state.layout ? ' (' + state.layout + ')' : ''} · ${state.phase}`;
+  $('pvSlideTag').textContent = `#${state.order} · ${state.mode}${state.layout ? '/' + state.layout : ''}`;
   $('curInfo').textContent = `[${state.idx + 1}/${state.total}] ${state.title}${state.mode === 'SLIDE' && state.layout === 'BULLETS' ? `（漸進步驟 ${state.subStep}/${state.bullets?.length || 0}）` : ''}`;
   $('speakerNoteText').textContent = state.speakerNote || '（本頁未填寫講者備忘錄 speaker_note）';
   $('nextSlidePreview').textContent = state.nextSlide
@@ -1271,6 +1434,8 @@ function render() {
         </div>
       </div>
     `).join('');
+  resizePreviewFrames();
+  syncPreviewFrames();
 }
 
 async function refresh() {

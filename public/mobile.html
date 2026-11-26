@@ -618,6 +618,7 @@
     const params = new URLSearchParams(location.search);
     const roomId = params.get('room') || 'main';
     const isPc = location.pathname === '/pc';
+    const isPreview = params.get('preview') === '1';
     if (isPc) document.title = '筆電實作工作區';
     const UUID_KEY = 'sdi_uuid';
     let uuid = localStorage.getItem(UUID_KEY);
@@ -725,7 +726,7 @@
 
       const voted = getVoted(state.slideId);
       const bm = isBookmarked(state.slideId);
-      const key = [state.slideId, state.mode, state.layout, state.phase, state.timerEndsAt, state.correctOpt || '', voted ? JSON.stringify(voted) : '', bm, JSON.stringify(state.linksSpec || null), JSON.stringify(getDoneMap())].join('|');
+      const key = [state.v, state.slideId, state.mode, state.layout, state.phase, state.timerEndsAt, state.correctOpt || '', voted ? JSON.stringify(voted) : '', bm, JSON.stringify(state.linksSpec || null), JSON.stringify(getDoneMap())].join('|');
       if (lastRenderKey === key) return;
       lastRenderKey = key;
 
@@ -1002,10 +1003,22 @@
     }
 
     document.addEventListener('visibilitychange', () => {
-      if (!document.hidden && !es) syncOnce();
+      if (!isPreview && !document.hidden && !es) syncOnce();
+    });
+
+    window.addEventListener('message', e => {
+      if (e.origin === location.origin && e.data?.type === 'sdi_preview_state' && e.data.state) {
+        connDot.classList.remove('off');
+        applyState(e.data.state);
+      }
     });
 
     async function startSync() {
+      if (isPreview) {
+        connDot.classList.remove('off');
+        window.parent?.postMessage({ type: 'sdi_preview_ready', mode: isPc ? 'pc' : 'mobile' }, location.origin);
+        return;
+      }
       const initial = await syncOnce();
       if (initial && typeof initial.pollMs === 'number') pollMs = initial.pollMs;
       if (initial && initial.sse === false) {
