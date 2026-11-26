@@ -65,7 +65,7 @@ async function runTests() {
   assert.ok(presets.some((p) => p.id === 'parent-orientation'));
   assert.ok(presets.some((p) => p.id === 'lecture'));
   const lecPkg = await loadPreset('lecture');
-  assert.equal(lecPkg.deck.length, 23);
+  assert.equal(lecPkg.deck.length, 28);
   const parentPkg = await loadPreset('parent-orientation');
   assert.equal(parentPkg.config.bg_theme, 'CLEAN_LIGHT');
   assert.equal(parentPkg.deck.length, 5);
@@ -193,7 +193,7 @@ async function runTests() {
     const lectureRes = await fetch(`${base}/api/state?room=lecture`);
     assert.equal(lectureRes.status, 200);
     const lectureJson = await lectureRes.json();
-    assert.equal(lectureJson.total, 23);
+    assert.equal(lectureJson.total, 28);
 
     // Test admin login + goto + all interactive modes + stage hotkey control
     const loginRes = await fetch(`${base}/api/admin/login?room=testroom`, {
