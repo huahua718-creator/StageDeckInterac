@@ -58,8 +58,9 @@ async function runTests() {
   for (const layout of ['COVER', 'QUOTE', 'BULLETS', 'SPLIT', 'MEDIA', 'DIAGRAM', 'CHART', 'CARDS', 'LINKS']) {
     assert.ok(pkg.deck.some((s) => s.mode === 'SLIDE' && s.layout === layout), `Showcase deck should include layout ${layout}`);
   }
-  assert.equal(pkg.config.primary_color, '#6366f1');
-  assert.equal(pkg.config.event_subtitle, '高中教師增能研習工作坊');
+  assert.equal(pkg.config.primary_color, '#2563eb');
+  assert.equal(pkg.config.bg_theme, 'CLEAN_LIGHT');
+  assert.equal(pkg.config.event_subtitle, '適性揚才・科技賦能・看見孩子發光的樣子');
 
   const presets = listPresets();
   assert.ok(presets.some((p) => p.id === 'parent-orientation'));
