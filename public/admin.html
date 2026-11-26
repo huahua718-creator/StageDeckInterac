@@ -57,6 +57,14 @@
       gap: 18px
     }
 
+    .grid.pv-expanded {
+      grid-template-columns: 1fr
+    }
+
+    .grid.pv-expanded .right-col {
+      order: -1
+    }
+
     .grid-2 {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -77,15 +85,51 @@
       gap: 12px
     }
 
-    .pv-grid.both {
+    .pv-grid.has-pc-mob {
       grid-template-columns: 1.55fr 1fr;
       align-items: start
     }
 
-    @media(max-width:720px) {
-      .pv-grid.both {
+    .pv-grid.pv-row3 {
+      grid-template-columns: 1.7fr 1.25fr .85fr;
+      align-items: start
+    }
+
+    .pv-stage-full {
+      grid-column: 1 / -1
+    }
+
+    @media(max-width:760px) {
+      .pv-grid.has-pc-mob,
+      .pv-grid.pv-row3 {
         grid-template-columns: 1fr
       }
+    }
+
+    .pv-chk {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 9px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: #0b1326;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none
+    }
+
+    .pv-chk.on {
+      border-color: var(--sky);
+      background: rgba(56, 189, 248, .16);
+      color: #e0f2fe
+    }
+
+    .pv-chk input {
+      margin: 0;
+      accent-color: var(--sky);
+      cursor: pointer
     }
 
     .pv-box {
@@ -594,8 +638,8 @@
           <div id="nextSlidePreview" class="next-preview">下一頁預告：--</div>
         </div>
 
-        <div class="grid">
-          <div>
+        <div id="mainGrid" class="grid">
+          <div class="left-col">
             <div class="card">
               <div class="row" style="justify-content:space-between;margin-bottom:12px">
                 <h3 style="margin:0">🎯 簡報筆狀態機控制</h3>
@@ -630,26 +674,33 @@
             </div>
           </div>
 
-          <div>
+          <div class="right-col">
             <div class="card">
-              <div class="row" style="justify-content:space-between;margin-bottom:10px">
+              <div class="row" style="justify-content:space-between;margin-bottom:10px;gap:8px">
                 <h3 style="margin:0">👁 題目畫面預覽 <span id="pvSlideTag" class="tag">--</span></h3>
                 <div class="row" style="gap:6px">
-                  <button type="button" id="pvBtnPc" class="ghost xs" onclick="setPreviewMode('pc')">💻 筆電</button>
-                  <button type="button" id="pvBtnMob" class="ghost xs" onclick="setPreviewMode('mobile')">📱 手機</button>
-                  <button type="button" id="pvBtnBoth" class="sky xs" onclick="setPreviewMode('both')">💻+📱 兩者</button>
+                  <label id="pvLblStage" class="pv-chk"><input id="pvChkStage" type="checkbox"> 🖥 大螢幕</label>
+                  <label id="pvLblPc" class="pv-chk"><input id="pvChkPc" type="checkbox"> 💻 觀眾筆電</label>
+                  <label id="pvLblMob" class="pv-chk"><input id="pvChkMob" type="checkbox"> 📱 觀眾手機</label>
+                  <button type="button" id="pvExpandBtn" class="ghost xs" title="切換全寬並排放大預覽">⤢ 放大</button>
                   <button type="button" id="pvEditCurBtn" class="primary xs">✏️ 修改這題</button>
                 </div>
               </div>
-              <div id="pvGrid" class="pv-grid both">
+              <div id="pvGrid" class="pv-grid">
+                <div id="pvStageCard" class="pv-box pv-stage-full">
+                  <div class="pv-label"><span>🖥 大螢幕端 (/)</span><span class="muted" style="font-size:11px">16:9 現場投影視角</span>
+                  </div>
+                  <div id="pvStageViewport" class="pv-viewport"><iframe id="pvStageFrame" width="1280" height="720"
+                      title="大螢幕預覽"></iframe></div>
+                </div>
                 <div id="pvPcCard" class="pv-box">
-                  <div class="pv-label"><span>💻 筆電端 (/pc)</span><span class="muted" style="font-size:11px">寬螢幕視角</span>
+                  <div class="pv-label"><span>💻 觀眾筆電端 (/pc)</span><span class="muted" style="font-size:11px">寬螢幕視角</span>
                   </div>
                   <div id="pvPcViewport" class="pv-viewport"><iframe id="pvPcFrame" width="900" height="560"
                       title="筆電預覽"></iframe></div>
                 </div>
                 <div id="pvMobCard" class="pv-box">
-                  <div class="pv-label"><span>📱 手機端 (/m)</span><span class="muted" style="font-size:11px">直立視角</span>
+                  <div class="pv-label"><span>📱 觀眾手機端 (/m)</span><span class="muted" style="font-size:11px">直立視角</span>
                   </div>
                   <div id="pvMobViewport" class="pv-viewport"><iframe id="pvMobFrame" width="390" height="620"
                       title="手機預覽"></iframe></div>
@@ -1017,29 +1068,77 @@
     $('settingsToggleBtn').onclick = () => setSettingsOpen(!settingsOpen);
     $('backToControlBtn').onclick = () => setSettingsOpen(false);
 
-    let pvMode = localStorage.getItem('sdi_pv_mode') || 'both';
+    let pvSel = (() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('sdi_pv_sel') || 'null');
+        if (saved && (saved.stage || saved.pc || saved.mobile)) return saved;
+      } catch { }
+      return { stage: true, pc: true, mobile: true };
+    })();
+    let pvExpanded = false;
     let pvLoadedRoom = '';
     function ensurePreviewIframes() {
       if (pvLoadedRoom === roomId) return;
       pvLoadedRoom = roomId;
+      $('pvStageFrame').src = `/?room=${encodeURIComponent(roomId)}&preview=1`;
       $('pvPcFrame').src = `/pc?room=${encodeURIComponent(roomId)}&preview=1`;
       $('pvMobFrame').src = `/m?room=${encodeURIComponent(roomId)}&preview=1`;
     }
 
-    function setPreviewMode(mode) {
-      pvMode = ['pc', 'mobile', 'both'].includes(mode) ? mode : 'both';
-      try { localStorage.setItem('sdi_pv_mode', pvMode); } catch { }
-      $('pvBtnPc').className = (pvMode === 'pc' ? 'sky' : 'ghost') + ' xs';
-      $('pvBtnMob').className = (pvMode === 'mobile' ? 'sky' : 'ghost') + ' xs';
-      $('pvBtnBoth').className = (pvMode === 'both' ? 'sky' : 'ghost') + ' xs';
-      $('pvPcCard').style.display = pvMode === 'mobile' ? 'none' : 'block';
-      $('pvMobCard').style.display = pvMode === 'pc' ? 'none' : 'block';
-      $('pvGrid').className = pvMode === 'both' ? 'pv-grid both' : 'pv-grid';
+    function applyPreviewSelection() {
+      try { localStorage.setItem('sdi_pv_sel', JSON.stringify(pvSel)); } catch { }
+      $('pvChkStage').checked = pvSel.stage;
+      $('pvChkPc').checked = pvSel.pc;
+      $('pvChkMob').checked = pvSel.mobile;
+      $('pvLblStage').className = 'pv-chk' + (pvSel.stage ? ' on' : '');
+      $('pvLblPc').className = 'pv-chk' + (pvSel.pc ? ' on' : '');
+      $('pvLblMob').className = 'pv-chk' + (pvSel.mobile ? ' on' : '');
+      $('pvStageCard').style.display = pvSel.stage ? 'block' : 'none';
+      $('pvPcCard').style.display = pvSel.pc ? 'block' : 'none';
+      $('pvMobCard').style.display = pvSel.mobile ? 'block' : 'none';
+
+      $('mainGrid').className = pvExpanded ? 'grid pv-expanded' : 'grid';
+      $('pvExpandBtn').textContent = pvExpanded ? '⤡ 收回雙欄' : '⤢ 放大';
+      $('pvExpandBtn').className = (pvExpanded ? 'sky' : 'ghost') + ' xs';
+
+      const count = (pvSel.stage ? 1 : 0) + (pvSel.pc ? 1 : 0) + (pvSel.mobile ? 1 : 0);
+      if (pvExpanded && count === 3) {
+        $('pvGrid').className = 'pv-grid pv-row3';
+        $('pvStageCard').className = 'pv-box';
+      } else if (pvExpanded && pvSel.stage && (pvSel.pc || pvSel.mobile)) {
+        $('pvGrid').className = 'pv-grid has-pc-mob';
+        $('pvStageCard').className = 'pv-box';
+      } else {
+        $('pvStageCard').className = 'pv-box pv-stage-full';
+        $('pvGrid').className = (pvSel.pc && pvSel.mobile) ? 'pv-grid has-pc-mob' : 'pv-grid';
+      }
       setTimeout(() => { resizePreviewFrames(); syncPreviewFrames(); }, 20);
     }
 
+    for (const [id, key] of [['pvChkStage', 'stage'], ['pvChkPc', 'pc'], ['pvChkMob', 'mobile']]) {
+      $(id).onchange = () => {
+        const next = { ...pvSel, [key]: $(id).checked };
+        if (!next.stage && !next.pc && !next.mobile) {
+          $(id).checked = true;
+          return;
+        }
+        pvSel = next;
+        applyPreviewSelection();
+      };
+    }
+    $('pvExpandBtn').onclick = () => { pvExpanded = !pvExpanded; applyPreviewSelection(); };
+
     function resizePreviewFrames() {
       if ($('controlView').style.display === 'none') return;
+      if ($('pvStageCard').style.display !== 'none') {
+        const vp = $('pvStageViewport'), fr = $('pvStageFrame');
+        const w = vp.clientWidth;
+        if (w > 40) {
+          const s = Math.min(1, w / 1280);
+          fr.style.transform = `scale(${s})`;
+          vp.style.height = `${Math.round(720 * s)}px`;
+        }
+      }
       if ($('pvPcCard').style.display !== 'none') {
         const vp = $('pvPcViewport'), fr = $('pvPcFrame');
         const w = vp.clientWidth;
@@ -1090,13 +1189,16 @@
         timerEndsAt: state.timerEndsAt || 0,
         correctOpt: state.correctOpt,
         explanation: state.explanation,
+        qrVisible: state.qrVisible,
+        stats: state.stats || null,
       };
     }
 
     function syncPreviewFrames() {
       const payload = buildPreviewPayload();
       if (!payload) return;
-      for (const fr of [$('pvPcFrame'), $('pvMobFrame')]) {
+      for (const [card, fr] of [[$('pvStageCard'), $('pvStageFrame')], [$('pvPcCard'), $('pvPcFrame')], [$('pvMobCard'), $('pvMobFrame')]]) {
+        if (card.style.display === 'none') continue;
         try {
           fr.contentWindow?.postMessage({ type: 'sdi_preview_state', state: payload }, location.origin);
         } catch { }
@@ -1109,12 +1211,13 @@
         resizePreviewFrames();
       }
     });
+    $('pvStageFrame').onload = syncPreviewFrames;
     $('pvPcFrame').onload = syncPreviewFrames;
     $('pvMobFrame').onload = syncPreviewFrames;
     $('pvEditCurBtn').onclick = () => { if (state) openEditor({ replaceIndex: state.idx }); };
     if (window.ResizeObserver) new ResizeObserver(resizePreviewFrames).observe($('pvGrid'));
     window.addEventListener('resize', resizePreviewFrames);
-    setPreviewMode(pvMode);
+    applyPreviewSelection();
 
     $('loginBtn').onclick = () => tryLogin($('pwdInput').value);
     $('pwdInput').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };

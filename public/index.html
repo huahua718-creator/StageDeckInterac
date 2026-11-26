@@ -393,6 +393,11 @@ canvas#cv{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
 <script>
 const params = new URLSearchParams(location.search);
 const roomId = params.get('room') || 'main';
+const isPreview = params.get('preview') === '1';
+if (isPreview) {
+  const bar = document.querySelector('.bottom-bar');
+  if (bar) bar.style.display = 'none';
+}
 const sheetParam = params.get('sheet') || '';
 const configParam = params.get('config') || '';
 const presetParam = params.get('preset') || '';
@@ -1378,7 +1383,17 @@ function enableOfflineFallback() {
   }
 }
 
+window.addEventListener('message', (e) => {
+  if (e.origin === location.origin && e.data?.type === 'sdi_preview_state' && e.data.state) {
+    applyState(e.data.state);
+  }
+});
+
 function startSync() {
+  if (isPreview) {
+    window.parent?.postMessage({ type: 'sdi_preview_ready', mode: 'stage' }, location.origin);
+    return;
+  }
   fetchStageState(true).then(() => {
     if (state && (state.isVercel || state.storageKind !== 'memory')) {
       if (!pollTimer) pollTimer = setInterval(() => fetchStageState(false), 1000);
